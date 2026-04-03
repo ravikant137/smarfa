@@ -4,3 +4,5 @@ __pycache__/
 *.db
 .env
 .expo/
+node_modules/
+mobile-app/node_modules/
