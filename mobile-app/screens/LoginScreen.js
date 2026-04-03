@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity, Animated, Easing, 
 import { LinearGradient } from 'react-native-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AnimatedButton from '../components/AnimatedButton';
+import GradientHeader from '../components/GradientHeader';
 
 const { width, height } = Dimensions.get('window');
 
@@ -28,11 +29,9 @@ export default function LoginScreen({ navigation }) {
   });
 
   return (
-    <Animated.View style={[styles.container, { backgroundColor: backgroundInterpolation }]}>
+    <Animated.View style={[styles.container, { backgroundColor: backgroundInterpolation }]}> 
+      <GradientHeader subtitle="Farm smarter with AI-powered insights" />
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        <Ionicons name="leaf" size={80} color="#FFD700" style={styles.icon} />
-        <Text style={styles.title}>Smart AI Farming</Text>
-        <Text style={styles.subtitle}>Monitor your crops with expert insights</Text>
         <View style={styles.card}>
           <View style={styles.inputContainer}>
             <Ionicons name="mail" size={24} color="#666" style={styles.inputIcon} />

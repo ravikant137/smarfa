@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity, Animated } from 'r
 import { LinearGradient } from 'react-native-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AnimatedButton from '../components/AnimatedButton';
+import GradientHeader from '../components/GradientHeader';
 
 export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState('');
@@ -16,6 +17,7 @@ export default function RegisterScreen({ navigation }) {
 
   return (
     <LinearGradient colors={['#065F46', '#047857']} style={styles.container}>
+      <GradientHeader subtitle="Create your farm intelligence dashboard" />
       <Animated.View style={[styles.content, { transform: [{ translateY: slideAnim }] }]}>
         <Ionicons name="person-add" size={60} color="#FFD700" style={styles.icon} />
         <Text style={styles.header}>Join Smart Farming</Text>

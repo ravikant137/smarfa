@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Animated } from 'react-native';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import GradientHeader from '../components/GradientHeader';
 import axios from 'axios';
 
 export default function AlertsScreen() {
@@ -61,12 +62,9 @@ export default function AlertsScreen() {
 
   return (
     <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.container}>
-      <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-        <MaterialCommunityIcons name="bell-alert" size={32} color="#EF4444" />
-        <Text style={styles.title}>Expert Alerts</Text>
-        <Text style={styles.subtitle}>30+ years of farming wisdom in every alert</Text>
-      </Animated.View>
-      <FlatList
+      <GradientHeader subtitle="Actionable alerts for better yield" />
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <FlatList
         data={alerts}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
@@ -86,6 +84,7 @@ export default function AlertsScreen() {
         )}
         contentContainerStyle={styles.listContent}
       />
+      </Animated.View>
     </LinearGradient>
   );
 }

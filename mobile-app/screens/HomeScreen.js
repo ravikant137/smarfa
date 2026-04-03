@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AnimatedButton from '../components/AnimatedButton';
+import GradientHeader from '../components/GradientHeader';
 import axios from 'axios';
 
 export default function HomeScreen({ navigation }) {
@@ -18,13 +19,9 @@ export default function HomeScreen({ navigation }) {
   return (
     <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-          <Ionicons name="leaf" size={40} color="#10B981" />
-          <Text style={styles.welcome}>Welcome, Farmer</Text>
-          <Text style={styles.subtitle}>Your crops are under expert watch</Text>
-        </Animated.View>
-
-        <View style={styles.statsGrid}>
+        <GradientHeader subtitle="Harvest strong insights with every screen" />
+        <Animated.View style={{ opacity: fadeAnim }}>
+          <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="ruler" size={32} color="#3B82F6" />
             <Text style={styles.statValue}>{stats.cropHeight} cm</Text>
@@ -53,6 +50,7 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.tip}>
           <Ionicons name="bulb" size={16} color="#FCD34D" /> Tip: Monitor alerts daily for optimal yield. Our AI expert analyzes 30+ years of farming data.
         </Text>
+      </Animated.View>
       </ScrollView>
     </LinearGradient>
   );
