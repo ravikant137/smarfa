@@ -1,0 +1,131 @@
+import React, { useState } from 'react';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions } from 'react-native';
+import { LinearGradient } from 'react-native-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import AnimatedButton from '../components/AnimatedButton';
+
+const { width, height } = Dimensions.get('window');
+
+export default function LoginScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const progress = React.useRef(new Animated.Value(0)).current;
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(progress, { toValue: 1, duration: 2000, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+        Animated.timing(progress, { toValue: 0, duration: 2000, useNativeDriver: true, easing: Easing.in(Easing.quad) }),
+      ])
+    ).start();
+    Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }).start();
+  }, [progress, fadeAnim]);
+
+  const backgroundInterpolation = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#1E3A8A', '#059669'],
+  });
+
+  return (
+    <Animated.View style={[styles.container, { backgroundColor: backgroundInterpolation }]}>
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        <Ionicons name="leaf" size={80} color="#FFD700" style={styles.icon} />
+        <Text style={styles.title}>Smart AI Farming</Text>
+        <Text style={styles.subtitle}>Monitor your crops with expert insights</Text>
+        <View style={styles.card}>
+          <View style={styles.inputContainer}>
+            <Ionicons name="mail" size={24} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              keyboardType="email-address"
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.inputContainer}>
+            <Ionicons name="lock-closed" size={24} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              secureTextEntry
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              placeholderTextColor="#999"
+            />
+          </View>
+          <AnimatedButton title="Login" onPress={() => navigation.navigate('Home')} colors={['#059669', '#047857']} />
+          <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.link}>
+            <Text style={styles.linkText}>New farmer? Create account</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  content: {
+    alignItems: 'center',
+  },
+  icon: {
+    marginBottom: 20,
+  },
+  title: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    color: '#E0F2FE',
+    textAlign: 'center',
+    marginBottom: 32,
+    fontSize: 16,
+  },
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 12 },
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    color: '#1F2937',
+    fontSize: 16,
+  },
+  link: {
+    marginTop: 16,
+    alignSelf: 'center',
+  },
+  linkText: {
+    color: '#059669',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
