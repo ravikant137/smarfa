@@ -1,44 +1,10 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
-
-const { width } = Dimensions.get('window');
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function GradientHeader({ subtitle }) {
-  const shiftAnim = useRef(new Animated.Value(0)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(shiftAnim, {
-            toValue: 1,
-            duration: 4500,
-            useNativeDriver: false,
-          }),
-          Animated.timing(shiftAnim, {
-            toValue: 0,
-            duration: 4500,
-            useNativeDriver: false,
-          }),
-        ])
-      ),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [shiftAnim, opacityAnim]);
-
-  const translateX = shiftAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, width * 0.05],
-  });
-
   return (
-    <Animated.View style={[styles.outer, { opacity: opacityAnim, transform: [{ translateX }] }]}> 
+    <View style={styles.outer}>
       <LinearGradient
         colors={['rgba(16,185,129,0.92)', 'rgba(59,130,246,0.72)', 'rgba(168,85,247,0.42)']}
         start={{ x: 0, y: 0 }}
@@ -50,7 +16,7 @@ export default function GradientHeader({ subtitle }) {
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
       </LinearGradient>
-    </Animated.View>
+    </View>
   );
 }
 

@@ -26,3 +26,9 @@ class Alert(Base):
     type = Column(String, nullable=False)
     message = Column(String, nullable=False)
     timestamp = Column(DateTime, nullable=False)
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)

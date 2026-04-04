@@ -1,17 +1,38 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions, Alert } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AnimatedButton from '../components/AnimatedButton';
 import GradientHeader from '../components/GradientHeader';
+import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const progress = React.useRef(new Animated.Value(0)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  const login = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const response = await axios.post('http://10.0.2.2:8000/login', {
+        username: email.trim(),
+        password,
+      });
+      setLoading(false);
+      if (response.data?.status === 'login successful') {
+        navigation.navigate('Home');
+      }
+    } catch (err) {
+      setLoading(false);
+      setError(err.response?.data?.detail || 'Login failed. Check credentials and try again.');
+    }
+  };
 
   React.useEffect(() => {
     Animated.loop(
@@ -55,7 +76,8 @@ export default function LoginScreen({ navigation }) {
               placeholderTextColor="#999"
             />
           </View>
-          <AnimatedButton title="Login" onPress={() => navigation.navigate('Home')} colors={['#059669', '#047857']} />
+          <AnimatedButton title={loading ? 'Signing in...' : 'Login'} onPress={login} colors={['#059669', '#047857']} />
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.link}>
             <Text style={styles.linkText}>New farmer? Create account</Text>
           </TouchableOpacity>
@@ -121,6 +143,12 @@ const styles = StyleSheet.create({
   link: {
     marginTop: 16,
     alignSelf: 'center',
+  },
+  errorText: {
+    color: '#EF4444',
+    marginTop: 8,
+    textAlign: 'center',
+    fontWeight: '700',
   },
   linkText: {
     color: '#059669',

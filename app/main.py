@@ -1,12 +1,15 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
+from passlib.context import CryptContext
 
 from app.database import init_db, get_session
-from app.models import CropData, IntrusionEvent, Alert
+from app.models import CropData, IntrusionEvent, Alert, User
 from app.sensors import process_growth_reading, process_intrusion_reading
 from app.config import settings
 from app.mobile import register_device, list_devices, send_push
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI(title="Smart AI Farming")
 
@@ -68,6 +71,35 @@ class MobilePush(BaseModel):
     farmer_id: str
     title: str
     body: str
+
+class UserRegister(BaseModel):
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+@app.post("/register")
+async def register_user(payload: UserRegister):
+    session = get_session()
+    existing = session.query(User).filter(User.username == payload.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="User already exists")
+    hashed = pwd_context.hash(payload.password)
+    user = User(username=payload.username, password_hash=hashed)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return {"status": "user registered", "id": user.id}
+
+@app.post("/login")
+async def login_user(payload: UserLogin):
+    session = get_session()
+    user = session.query(User).filter(User.username == payload.username).first()
+    if not user or not pwd_context.verify(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"status": "login successful", "user_id": user.id}
 
 @app.get("/alerts")
 async def list_alerts():

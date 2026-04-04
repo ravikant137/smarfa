@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, Animated } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function AnimatedButton({ title, onPress, colors = ['#4CAF50', '#2E7D32'] }) {
   const scale = React.useRef(new Animated.Value(1)).current;

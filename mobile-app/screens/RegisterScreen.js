@@ -1,15 +1,36 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { LinearGradient } from 'react-native-linear-gradient';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AnimatedButton from '../components/AnimatedButton';
 import GradientHeader from '../components/GradientHeader';
+import axios from 'axios';
 
 export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const slideAnim = React.useRef(new Animated.Value(300)).current;
+
+  const register = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const response = await axios.post('http://10.0.2.2:8000/register', {
+        username: email.trim(),
+        password,
+      });
+      setLoading(false);
+      if (response.data?.status === 'user registered') {
+        navigation.navigate('Home');
+      }
+    } catch (err) {
+      setLoading(false);
+      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+    }
+  };
 
   React.useEffect(() => {
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
@@ -55,7 +76,8 @@ export default function RegisterScreen({ navigation }) {
               placeholderTextColor="#999"
             />
           </View>
-          <AnimatedButton title="Register" onPress={() => navigation.navigate('Home')} colors={['#059669', '#047857']} />
+          <AnimatedButton title={loading ? 'Creating account...' : 'Register'} onPress={register} colors={['#059669', '#047857']} />
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.link}>
             <Text style={styles.linkText}>Already have account? Sign in</Text>
           </TouchableOpacity>
@@ -116,6 +138,12 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#1F2937',
     fontSize: 16,
+  },
+  errorText: {
+    color: '#EF4444',
+    marginTop: 8,
+    textAlign: 'center',
+    fontWeight: '700',
   },
   link: {
     marginTop: 16,
