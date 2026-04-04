@@ -64,8 +64,14 @@ uvicorn app.main:app --reload
 # Check version
 node --version
 
-# If outdated, download latest LTS from https://nodejs.org/
+# If outdated, install a compatible version
+# Windows: download from https://nodejs.org/
+# Or use nvm/nvm-windows:
+# nvm install 20.19.4
+# nvm use 20.19.4
 ```
+
+2. A `.nvmrc` file is included in `mobile-app/` to simplify version selection.
 
 2. Install mobile app dependencies:
 

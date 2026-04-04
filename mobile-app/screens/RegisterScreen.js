@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AnimatedButton from '../components/AnimatedButton';
 import GradientHeader from '../components/GradientHeader';
+import { getApiBaseUrl } from '../utils/api';
 import axios from 'axios';
 
 export default function RegisterScreen({ navigation }) {
@@ -16,19 +17,28 @@ export default function RegisterScreen({ navigation }) {
 
   const register = async () => {
     setError('');
+
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await axios.post('http://10.0.2.2:8000/register', {
-        username: email.trim(),
+      const response = await axios.post(`${getApiBaseUrl()}/register`, {
+        username: email.trim().toLowerCase(),
         password,
       });
-      setLoading(false);
+
       if (response.data?.status === 'user registered') {
         navigation.navigate('Home');
+      } else {
+        setError(response.data?.detail || 'Registration failed. Please try again.');
       }
     } catch (err) {
+      setError(err.response?.data?.detail || err.message || 'Registration failed. Please try again.');
+    } finally {
       setLoading(false);
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
     }
   };
 
@@ -76,7 +86,12 @@ export default function RegisterScreen({ navigation }) {
               placeholderTextColor="#999"
             />
           </View>
-          <AnimatedButton title={loading ? 'Creating account...' : 'Register'} onPress={register} colors={['#059669', '#047857']} />
+          <AnimatedButton
+            title={loading ? 'Creating account...' : 'Register'}
+            onPress={register}
+            colors={['#059669', '#047857']}
+            disabled={loading}
+          />
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.link}>
             <Text style={styles.linkText}>Already have account? Sign in</Text>

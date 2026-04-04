@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AnimatedButton from '../components/AnimatedButton';
 import GradientHeader from '../components/GradientHeader';
+import { getApiBaseUrl } from '../utils/api';
 import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
@@ -20,7 +21,7 @@ export default function LoginScreen({ navigation }) {
     setError('');
     setLoading(true);
     try {
-      const response = await axios.post('http://10.0.2.2:8000/login', {
+      const response = await axios.post(`${getApiBaseUrl()}/login`, {
         username: email.trim(),
         password,
       });

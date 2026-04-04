@@ -2,27 +2,32 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-export default function AnimatedButton({ title, onPress, colors = ['#4CAF50', '#2E7D32'] }) {
+export default function AnimatedButton({ title, onPress, colors = ['#4CAF50', '#2E7D32'], disabled = false }) {
   const scale = React.useRef(new Animated.Value(1)).current;
 
   const onPressIn = () => {
-    Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start();
+    if (!disabled) {
+      Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start();
+    }
   };
 
   const onPressOut = () => {
-    Animated.spring(scale, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+    if (!disabled) {
+      Animated.spring(scale, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+    }
   };
 
   return (
     <Animated.View style={[{ transform: [{ scale }] }, styles.wrapper]}>
       <TouchableOpacity
-        style={styles.button}
+        style={[styles.button, disabled && styles.disabledButton]}
         onPress={onPress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         activeOpacity={0.8}
+        disabled={disabled}
       >
-        <LinearGradient colors={colors} style={styles.gradient}>
+        <LinearGradient colors={colors} style={[styles.gradient, disabled && styles.disabledGradient]}>
           <Text style={styles.text}>{title}</Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -44,9 +49,15 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  disabledButton: {
+    opacity: 0.75,
+  },
   gradient: {
     paddingVertical: 18,
     alignItems: 'center',
+  },
+  disabledGradient: {
+    opacity: 0.75,
   },
   text: {
     color: '#fff',

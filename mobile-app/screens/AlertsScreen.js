@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import GradientHeader from '../components/GradientHeader';
+import { getApiBaseUrl } from '../utils/api';
 import axios from 'axios';
 
 export default function AlertsScreen() {
@@ -11,7 +12,7 @@ export default function AlertsScreen() {
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-    axios.get('http://10.0.2.2:8000/alerts')
+    axios.get(`${getApiBaseUrl()}/alerts`)
       .then((res) => setAlerts(res.data))
       .catch(() => {
         setAlerts([

@@ -13,7 +13,7 @@ export default function HomeScreen({ navigation }) {
   React.useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }).start();
     // In a real app: fetch backend status / analytics.
-    // axios.get('http://10.0.2.2:8000/summary').then(response => setStats(response.data)).catch(() => {});
+    // axios.get(`${getApiBaseUrl()}/summary`).then(response => setStats(response.data)).catch(() => {});
   }, [fadeAnim]);
 
   return (
