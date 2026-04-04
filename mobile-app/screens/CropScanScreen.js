@@ -14,12 +14,23 @@ export default function CropScanScreen() {
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
+  const [history, setHistory] = useState([]);
   const [error, setError] = useState('');
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+    loadHistory();
   }, [fadeAnim]);
+
+  const loadHistory = async () => {
+    try {
+      const response = await axios.get(`${getApiBaseUrl()}/scan_history?limit=8`, { timeout: 10000 });
+      setHistory(Array.isArray(response.data) ? response.data : []);
+    } catch {
+      setHistory([]);
+    }
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -69,6 +80,7 @@ export default function CropScanScreen() {
         image_base64: image.base64,
       }, { timeout: 60000 });
       setAnalysis(response.data);
+      loadHistory();
     } catch (err) {
       setError(err.response?.data?.detail || 'Analysis failed. Please try again.');
     } finally {
@@ -184,6 +196,22 @@ export default function CropScanScreen() {
                   <Text style={styles.analysisText}>{analysis.growth_needs}</Text>
                 </>
               )}
+            </View>
+          )}
+
+          {history.length > 0 && (
+            <View style={styles.analysisContainer}>
+              <Text style={styles.sectionTitle}>
+                <MaterialCommunityIcons name="history" size={18} color="#3B82F6" /> Scan History
+              </Text>
+              {history.map((item) => (
+                <View key={item.id} style={styles.issueCard}>
+                  <Text style={styles.issueName}>
+                    {item.crop_detected} • {(item.severity || 'info').toUpperCase()} • {Math.round(item.ai_confidence || 0)}%
+                  </Text>
+                  <Text style={styles.issueDesc}>{new Date(item.timestamp).toLocaleString()}</Text>
+                </View>
+              ))}
             </View>
           )}
         </Animated.View>

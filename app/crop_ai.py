@@ -13,6 +13,7 @@ import io
 import os
 import json
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,8 @@ OLLAMA_BASE = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 # Vision models need >6GB RAM. Set SMARFA_VISION=1 to enable on capable machines.
 _VISION_ENABLED = os.getenv("SMARFA_VISION", "0") == "1"
 _vision_failed_count = 0  # Track failures to auto-disable
+_FAST_ANALYSIS = os.getenv("SMARFA_FAST_ANALYSIS", "1") == "1"
+_LLM_TIMEOUT_SECONDS = float(os.getenv("SMARFA_LLM_TIMEOUT", "12" if _FAST_ANALYSIS else "45"))
 
 
 # ── Agricultural Knowledge Base ───────────────────────────────────────────
@@ -326,6 +329,54 @@ DISEASE_KNOWLEDGE = {
         ],
         "growth_needs": "Good drainage, moderate nitrogen, open canopy, fire blight resistant rootstock.",
     },
+    "Sunflower___Healthy": {
+        "crop": "Sunflower", "disease": None, "severity": "healthy",
+        "description": "Sunflower plant appears healthy with strong green foliage and no visible disease symptoms.",
+        "recommendations": [
+            "Maintain regular deep watering — sunflowers have deep tap roots.",
+            "Apply balanced fertilizer (10-10-10) at planting and side-dress with nitrogen.",
+            "Support tall varieties with stakes to prevent wind lodging.",
+            "Monitor for aphids and sunflower beetles — remove by hand or use neem oil.",
+            "Ensure well-drained soil to prevent root rot.",
+        ],
+        "growth_needs": "Full sun (6-8 hrs), well-drained soil pH 6.0-7.5, deep watering 1-2x/week, 18-28°C.",
+    },
+    "Sunflower___Downy_mildew": {
+        "crop": "Sunflower", "disease": "Downy Mildew", "severity": "warning",
+        "description": "Yellow patches on upper leaf surface with white-grey fuzzy growth underneath. Spreads rapidly in cool wet conditions.",
+        "recommendations": [
+            "Apply metalaxyl or mancozeb fungicide at first sign of symptoms.",
+            "Improve field drainage to reduce humidity around plants.",
+            "Avoid overhead irrigation — use drip irrigation instead.",
+            "Remove and destroy infected leaves immediately.",
+            "Plant certified disease-free seeds and resistant varieties.",
+        ],
+        "growth_needs": "Good drainage, avoid water-logging, full sun, wide row spacing for airflow.",
+    },
+    "Sunflower___Rust": {
+        "crop": "Sunflower", "disease": "Rust Disease", "severity": "warning",
+        "description": "Orange-brown powdery pustules on both leaf surfaces. Sunflower rust reduces photosynthesis and yield.",
+        "recommendations": [
+            "Apply triazole fungicide (propiconazole) at earliest sign of pustules.",
+            "Plant rust-resistant sunflower hybrids.",
+            "Destroy crop residue after harvest to reduce overwintering spores.",
+            "Avoid dense planting — ensure airflow between plants.",
+            "Monitor weekly during flowering when susceptibility is highest.",
+        ],
+        "growth_needs": "Full sun, proper spacing (45-60 cm), avoid dense canopy, well-drained soil.",
+    },
+    "Sunflower___Leaf_scorch": {
+        "crop": "Sunflower", "disease": "Leaf Scorch / Drought Stress", "severity": "warning",
+        "description": "Brown papery leaf edges and tips due to insufficient water or heat stress.",
+        "recommendations": [
+            "Increase watering frequency — sunflowers need 2-3 cm water/week in hot weather.",
+            "Apply thick mulch layer around base to retain soil moisture.",
+            "Avoid afternoon heat exposure for young seedlings.",
+            "Check soil moisture 5-6 cm deep before each irrigation.",
+            "Supplement with potassium fertilizer to improve drought tolerance.",
+        ],
+        "growth_needs": "Deep watering 2x/week, mulched soil, well-drained, avoid waterlogging.",
+    },
     "General___Powdery_mildew": {
         "crop": "General", "disease": "Powdery Mildew", "severity": "warning",
         "description": "White powdery patches on leaves and stems. Thrives in warm, dry conditions with cool nights.",
@@ -385,8 +436,8 @@ def extract_image_features(image_bytes: bytes) -> dict:
     import math
 
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    # Use larger sample for better accuracy
-    analysis_size = (150, 150)
+    # 128x128 keeps enough detail while reducing compute time.
+    analysis_size = (128, 128)
     small = img.resize(analysis_size)
     pixels = list(small.getdata())
     total = len(pixels)
@@ -482,8 +533,39 @@ def extract_image_features(image_bytes: bytes) -> dict:
     total_damaged = brown + necrotic_dark_brown + dry_tan + lesion_edge + dark + red_spots
     total_damaged_pct = round(total_damaged / total * 100, 1)
 
+    # ── HSV Hue Analysis (crop-type discrimination) ───────────────────
+    # colorsys is stdlib — no extra dependency.
+    import colorsys
+    hue_yellow = 0   # HSV hue 40-75°  — sunflower petals/stems
+    hue_warm = 0     # HSV hue  0-75°  — any warm orange/yellow/red
+    hue_cool_green = 0  # HSV hue 155-210° — apple, citrus (blue-green tones)
+    hue_pure_green = 0  # HSV hue  75-155° — pure mid-green (most leaves)
+    hue_purple = 0   # HSV hue 255-310° — grape/stress
+
+    for r, g, b in pixels:
+        h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+        if s < 0.12 or v < 0.15:  # skip near-grey / near-black pixels
+            continue
+        h_deg = h * 360.0
+        if 40 <= h_deg < 75:
+            hue_yellow += 1
+            hue_warm += 1
+        elif h_deg < 40 or h_deg >= 320:
+            hue_warm += 1
+        elif 75 <= h_deg < 155:
+            hue_pure_green += 1
+        elif 155 <= h_deg < 210:
+            hue_cool_green += 1
+        elif 255 <= h_deg < 320:
+            hue_purple += 1
+
+    # Leaf-complexity: high edge density relative to green coverage = lobed/compound leaf (grape)
+    green_pct_val = round(green / total * 100, 1)
+    safe_green = max(green_pct_val, 3.0)
+    leaf_complexity = round(edge_density / safe_green, 3)  # ~0.2 blade, ~0.5+ lobed/compound
+
     return {
-        "green_pct": round(green / total * 100, 1),
+        "green_pct": green_pct_val,
         "brown_pct": round(brown / total * 100, 1),
         "yellow_pct": round(yellow / total * 100, 1),
         "dark_pct": round(dark / total * 100, 1),
@@ -504,6 +586,13 @@ def extract_image_features(image_bytes: bytes) -> dict:
         "std_r": round(statistics.stdev(r_vals) if len(r_vals) > 1 else 0, 1),
         "std_g": round(statistics.stdev(g_vals) if len(g_vals) > 1 else 0, 1),
         "std_b": round(statistics.stdev(b_vals) if len(b_vals) > 1 else 0, 1),
+        # HSV-derived crop-ID features
+        "hue_yellow_pct": round(hue_yellow / total * 100, 1),
+        "hue_warm_pct": round(hue_warm / total * 100, 1),
+        "hue_cool_green_pct": round(hue_cool_green / total * 100, 1),
+        "hue_pure_green_pct": round(hue_pure_green / total * 100, 1),
+        "hue_purple_pct": round(hue_purple / total * 100, 1),
+        "leaf_complexity": leaf_complexity,
     }
 
 
@@ -657,10 +746,20 @@ Based on these measurements, answer these 4 questions:
 
 Remember: if brown>15% or necrotic>5%, the plant IS diseased."""
 
-    # Try phi3:mini first (best), then tinyllama as fast fallback
-    for model in ["phi3:mini", "tinyllama"]:
+    # Fast preflight: if Ollama is unavailable, skip LLM path immediately.
+    try:
+        async with httpx.AsyncClient(timeout=1.5) as client:
+            ping = await client.get(f"{OLLAMA_BASE}/api/tags")
+            if ping.status_code != 200:
+                return None
+    except Exception:
+        return None
+
+    models = ["phi3:mini"] if _FAST_ANALYSIS else ["phi3:mini", "tinyllama"]
+
+    for model in models:
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=_LLM_TIMEOUT_SECONDS) as client:
                 r = await client.post(f"{OLLAMA_BASE}/api/generate", json={
                     "model": model,
                     "prompt": prompt,
@@ -782,93 +881,283 @@ def _extract_crop_from_text(text: str) -> str:
 
 
 def _identify_crop_from_features(features: dict) -> tuple[str, int]:
-    """Identify likely crop from color/texture features. Returns (crop_name, confidence)."""
-    green = features.get("green_pct", 0)
-    brown = features.get("brown_pct", 0)
-    yellow = features.get("yellow_pct", 0)
-    dark = features.get("dark_pct", 0)
-    avg_r = features.get("avg_r", 0)
-    avg_g = features.get("avg_g", 0)
-    avg_b = features.get("avg_b", 0)
-    std_r = features.get("std_r", 0)
-    std_g = features.get("std_g", 0)
-    edge_density = features.get("edge_density", 0)
-    spots = features.get("spot_density", 0)
+    """Identify likely crop from color/texture/hue features. Returns (crop_name, confidence).
 
-    # Score each crop based on color/texture signatures
+    Discriminating axes used:
+    - hue_yellow_pct   : HSV-yellow pixels (40-75°) → strong sunflower indicator
+    - hue_warm_pct     : warm hue overall (0-75°) → sunflower, wheat, diseased tissue
+    - hue_cool_green_pct: blue-green (155-210°) → apple, citrus, mango
+    - leaf_complexity  : edge_density / green_pct → lobed/compound (grape > tomato > apple > corn)
+    - avg_std          : channel std-dev → surface roughness (hairy = high, waxy = low)
+    - blue_green_ratio : avg_b/avg_g → cooler darker green vs warmer yellow-green
+    """
+    green        = features.get("green_pct", 0)
+    yellow       = features.get("yellow_pct", 0)
+    orange       = features.get("orange_pct", 0)
+    avg_r        = features.get("avg_r", 128)
+    avg_g        = features.get("avg_g", 128)
+    avg_b        = features.get("avg_b", 128)
+    std_r        = features.get("std_r", 30)
+    std_g        = features.get("std_g", 30)
+    std_b        = features.get("std_b", 30)
+    edge_density = features.get("edge_density", 15)
+
+    # New HSV / complexity features (fall back gracefully if old data)
+    hue_yellow     = features.get("hue_yellow_pct", yellow)        # ~= yellow_pct if not computed
+    hue_warm       = features.get("hue_warm_pct", yellow + orange)
+    hue_cool_green = features.get("hue_cool_green_pct", 0)
+    hue_purple     = features.get("hue_purple_pct", features.get("purple_pct", 0))
+    leaf_cx        = features.get("leaf_complexity", edge_density / max(green, 3))
+
+    avg_std          = (std_r + std_g + std_b) / 3.0
+    blue_green_ratio = avg_b / max(avg_g, 1)
+    red_green_ratio  = avg_r / max(avg_g, 1)
+
+    if green < 8:
+        return "Unknown", 0
+
     scores: dict[str, float] = {}
 
-    # Tomato: broad dark-green leaves, high green, moderate edge detail
-    if green > 25 and avg_g > avg_r and avg_g > 70:
-        scores["Tomato"] = 20 + (green * 0.2) + (edge_density * 0.5 if edge_density > 15 else 0)
-        if avg_g > avg_b * 1.3:
-            scores["Tomato"] += 8
+    # ═══════════════════════════════════════════════════════════════════
+    # Rules use COMPOUND conditions so a single matching feature cannot
+    # single-handedly crown Tomato (the old bug).
+    # ═══════════════════════════════════════════════════════════════════
 
-    # Apple: bright green leaves, smoother texture, often lighter green
-    if green > 20 and avg_g > 80 and edge_density < 25:
-        scores["Apple"] = 18 + (green * 0.15)
-        if avg_r > 60 and avg_r < 120:
-            scores["Apple"] += 5
+    # ── SUNFLOWER ────────────────────────────────────────────────────────────
+    # Strong yellow/warm hue from petals or stems; rough-textured hairy leaves;
+    # simple (NOT compound) leaf shape → lower leaf_complexity than tomato.
+    sunflower = 0.0
+    is_warm_dominant = hue_warm > 10 or hue_yellow > 6 or (yellow + orange) > 8
+    if is_warm_dominant:
+        sunflower += 30                      # warm hue is the primary sunflower signal
+    if hue_yellow > 8:
+        sunflower += 18                      # distinct yellow hue range = sunflower petals
+    if avg_r > avg_g * 0.82:
+        sunflower += 8                       # reddish/warm overall
+    if avg_std >= 30:
+        sunflower += 6                       # hairy leaves = moderate roughness
+    if leaf_cx < 0.65:
+        sunflower += 8                       # simple leaf (not compound like tomato)
+    scores["Sunflower"] = sunflower
 
-    # Grape: darker green, sometimes purple tints, lobed leaves
+    # ── TOMATO ───────────────────────────────────────────────────────────────
+    # Compound hairy leaves (high leaf_complexity) + rough texture + neutral green.
+    # MUST NOT be warm/yellow dominant (that profile belongs to Sunflower).
+    tomato = 0.0
+    if not is_warm_dominant:                 # penalise heavily when warm/yellow dominates
+        tomato += 14
+    if leaf_cx >= 0.55:
+        tomato += 20                         # compound leaf = high edge-per-green-unit
+    if avg_std >= 36:
+        tomato += 12                         # hairy/fuzzy surface
+    if edge_density >= 20:
+        tomato += 8
+    if 0.75 <= red_green_ratio <= 0.98:
+        tomato += 6                          # neutral warm green (not super yellow)
+    if blue_green_ratio < 0.60:
+        tomato += 4
+    if hue_yellow < 5:
+        tomato += 6                          # tomato leaves are NOT bright yellow
+    scores["Tomato"] = tomato
+
+    # ── GRAPE ────────────────────────────────────────────────────────────────
+    # Palmate lobed leaves → very high leaf_complexity (many inter-lobe edges relative to area).
+    # Can show purple; doesn't require it.
+    grape = 0.0
+    if leaf_cx >= 0.60:
+        grape += 22                          # lobed = highest leaf_complexity of all broad-leaf crops
+    if hue_purple > 2:
+        grape += 20                          # purple is a definitive grape signal when present
+    if edge_density >= 22:
+        grape += 12
+    if green > 15:
+        grape += 6
+    if avg_std >= 25:
+        grape += 4
+    if not is_warm_dominant:
+        grape += 6                           # grape leaves are cool/neutral green
+    scores["Grape"] = grape
+
+    # ── POTATO ───────────────────────────────────────────────────────────────
+    # Compound leaves (similar to tomato but usually slightly less complex).
+    potato = 0.0
+    if leaf_cx >= 0.45:
+        potato += 14
+    if avg_std >= 28:
+        potato += 8
+    if green > 18:
+        potato += 6
+    if yellow > 5:
+        potato += 5
+    if not is_warm_dominant:
+        potato += 6
+    scores["Potato"] = potato
+
+    # ── CORN / MAIZE ─────────────────────────────────────────────────────────
+    # Long narrow smooth blades → very low leaf_complexity; very uniform colour.
+    corn = 0.0
+    if leaf_cx <= 0.35:
+        corn += 22                           # narrow blade = lowest complexity
+    if avg_std <= 30:
+        corn += 14                           # very uniform surface
+    if edge_density <= 14:
+        corn += 10
+    if green > 30:
+        corn += 8
+    if not is_warm_dominant:
+        corn += 5
+    scores["Corn"] = corn
+
+    # ── RICE ─────────────────────────────────────────────────────────────────
+    # Even narrower than corn; lighter green; very smooth.
+    rice = 0.0
+    if leaf_cx <= 0.30:
+        rice += 20
+    if avg_g > 90:
+        rice += 10                           # lighter green
+    if avg_std <= 35:
+        rice += 8
+    if edge_density <= 13:
+        rice += 10
+    scores["Rice"] = rice
+
+    # ── WHEAT ────────────────────────────────────────────────────────────────
+    # Yellow-green to golden; yellowing is the primary signal.
+    wheat = 0.0
+    if hue_yellow > 5 and leaf_cx < 0.5:
+        wheat += 22                          # yellow + narrow blade → wheat
+    if yellow > 8:
+        wheat += 16
+    if edge_density <= 14:
+        wheat += 8
+    if orange > 3:
+        wheat += 6                           # wheat rust produces orange spots
+    scores["Wheat"] = wheat
+
+    # ── APPLE ────────────────────────────────────────────────────────────────
+    # Simple oval glossy leaf; cool/dark green; low-moderate complexity; smooth.
+    apple = 0.0
+    if hue_cool_green > 5:
+        apple += 16                          # blue-green hue is the apple signature
+    if blue_green_ratio >= 0.57:
+        apple += 12
+    if leaf_cx <= 0.55 and leaf_cx >= 0.20:
+        apple += 10                          # simple leaf (not too smooth = not corn)
+    if avg_std <= 36:
+        apple += 8                           # waxy surface
+    if not is_warm_dominant:
+        apple += 6
+    if green > 15:
+        apple += 4
+    scores["Apple"] = apple
+
+    # ── CITRUS ───────────────────────────────────────────────────────────────
+    # Very glossy thick oval leaf; extremely smooth; distinctly cool/dark green.
+    citrus = 0.0
+    if hue_cool_green > 8:
+        citrus += 16
+    if blue_green_ratio >= 0.62:
+        citrus += 12
+    if avg_std <= 25:
+        citrus += 14                         # glossy = very low texture variance
+    if edge_density <= 16:
+        citrus += 10
+    if green > 30:
+        citrus += 6
+    scores["Citrus"] = citrus
+
+    # ── MANGO ────────────────────────────────────────────────────────────────
+    # Long elongated dark-green; smooth; moderate leaf_complexity.
+    mango = 0.0
+    if green > 28:
+        mango += 8
+    if avg_r < 90:
+        mango += 10                          # dark green = low red component
+    if avg_std <= 32:
+        mango += 8
+    if leaf_cx <= 0.50:
+        mango += 8
+    if hue_cool_green > 3:
+        mango += 6
+    scores["Mango"] = mango
+
+    # ── PEPPER ───────────────────────────────────────────────────────────────
+    # Simple oval leaves; slightly rough; moderate complexity.
+    pepper = 0.0
+    if leaf_cx >= 0.30 and leaf_cx <= 0.55:
+        pepper += 10
+    if avg_std >= 25 and avg_std <= 42:
+        pepper += 8
     if green > 20:
-        scores["Grape"] = 12 + (green * 0.1)
-        if features.get("purple_pct", 0) > 2:
-            scores["Grape"] += 15
-        if avg_g > 60 and avg_b > 40:
-            scores["Grape"] += 5
+        pepper += 6
+    if not is_warm_dominant:
+        pepper += 4
+    scores["Pepper"] = pepper
 
-    # Potato: medium green, compound leaves, similar to tomato
-    if green > 20 and avg_g > 60:
-        scores["Potato"] = 15 + (green * 0.15)
-        if yellow > 5:
-            scores["Potato"] += 3
+    # ── BANANA ───────────────────────────────────────────────────────────────
+    # Very large smooth paddle-shaped leaf; very low complexity; bright green.
+    banana = 0.0
+    if leaf_cx <= 0.28:
+        banana += 16
+    if avg_std <= 28:
+        banana += 10
+    if avg_g > 95:
+        banana += 8                          # bright fresh green
+    if green > 35:
+        banana += 6
+    scores["Banana"] = banana
 
-    # Corn/Maize: very elongated, uniform green, less texture variation
-    if green > 30 and std_r < 40 and std_g < 45:
-        scores["Corn"] = 15 + (green * 0.2)
-        if edge_density < 15:  # Smooth long leaves
-            scores["Corn"] += 10
-
-    # Rice: very narrow, uniform, lighter green
-    if green > 25 and avg_g > 90 and std_g < 35:
-        scores["Rice"] = 12 + (green * 0.15)
-        if edge_density < 12:
-            scores["Rice"] += 8
-
-    # Wheat: yellow-green to golden, narrow leaves
-    if green > 10 and yellow > 10:
-        scores["Wheat"] = 10 + (yellow * 0.3)
-        if avg_r > avg_g and avg_g > 80:
-            scores["Wheat"] += 8
-
-    # Citrus: glossy dark-green, thick leaves
-    if green > 30 and avg_g > 70 and dark < 20:
-        scores["Citrus"] = 14 + (green * 0.15)
-        if avg_b < 60 and avg_g > avg_r:
-            scores["Citrus"] += 5
-
-    # Pepper: dark green, smooth, broad
-    if green > 25 and avg_g > 60 and dark > 8:
-        scores["Pepper"] = 12 + (green * 0.1)
-
-    # Mango: large broad leaves, dark green
-    if green > 30 and avg_g > 70 and edge_density < 20:
-        scores["Mango"] = 14 + (green * 0.1)
-        if avg_r < 80 and avg_g > 90:
-            scores["Mango"] += 5
-
-    if not scores:
+    if not scores or max(scores.values()) < 5:
         return "Unknown", 0
 
     best_crop = max(scores, key=scores.get)
     best_score = scores[best_crop]
-    # Second best for confidence gap
-    sorted_crops = sorted(scores.values(), reverse=True)
-    gap = sorted_crops[0] - sorted_crops[1] if len(sorted_crops) > 1 else sorted_crops[0]
+    sorted_scores = sorted(scores.values(), reverse=True)
+    gap = sorted_scores[0] - sorted_scores[1] if len(sorted_scores) > 1 else sorted_scores[0]
 
-    confidence = min(int(best_score + gap * 0.5), 70)
+    # Confidence scales with how far ahead the winner is
+    confidence = min(int(30 + gap * 1.5 + best_score * 0.25), 90)
     return best_crop, confidence
+def _calibrate_confidence(result: dict, features: dict, llm_result: dict | None = None) -> int:
+    """Estimate confidence from multi-signal agreement.
+
+    This is an internal confidence score, not a guaranteed real-world accuracy metric.
+    """
+    crop = result.get("crop_detected", "Unknown")
+    severity = result.get("severity", "warning")
+    issues = result.get("issues", [])
+    total_damaged = features.get("total_damaged_pct", 0)
+    spread = features.get("damage_spread_pct", 0)
+    spots = features.get("spot_density", 0)
+
+    score = 62
+    if crop != "Unknown":
+        score += 10
+    if issues:
+        score += 8
+    if total_damaged > 20 or spots > 18:
+        score += 6
+    if spread > 30:
+        score += 4
+
+    crop_guess, crop_conf = _identify_crop_from_features(features)
+    if crop_guess != "Unknown":
+        score += min(int(crop_conf * 0.2), 12)
+
+    if llm_result:
+        llm_crop = llm_result.get("crop")
+        llm_severity = llm_result.get("severity")
+        if llm_crop and llm_crop != "Unknown" and llm_crop.lower() == str(crop).lower():
+            score += 8
+        if llm_severity and llm_severity == severity:
+            score += 6
+
+    if severity == "healthy" and total_damaged < 6:
+        score += 4
+    if severity in ("warning", "critical") and total_damaged > 15:
+        score += 5
+
+    return max(55, min(score, 98))
 
 
 def _build_pil_result(features: dict) -> dict:
@@ -1039,23 +1328,27 @@ def _build_pil_result(features: dict) -> dict:
     else:
         final_recs = knowledge["recommendations"]
 
-    # Calculate confidence based on how much data we have
-    confidence = 30
+    crop_guess, crop_conf = _identify_crop_from_features(features)
+
+    # Better baseline confidence from damage evidence + crop signal.
+    confidence = 58
     if total_damaged > 15:
-        confidence = 45  # More confident about disease when damage is clear
+        confidence += 8
     if spots > 15:
         confidence += 5
     if len(issues) >= 2:
         confidence += 5
+    if crop_guess != "Unknown":
+        confidence += min(int(crop_conf * 0.25), 18)
 
     return {
-        "crop_detected": _identify_crop_from_features(features)[0],
+        "crop_detected": crop_guess,
         "severity": severity,
         "health_assessment": desc,
         "issues": issues,
         "recommendations": final_recs,
         "growth_needs": knowledge["growth_needs"],
-        "ai_confidence": min(confidence, 60),
+        "ai_confidence": min(confidence, 93),
         "_model": "pil-advanced",
         "_color_stats": {
             "green_pct": green, "brown_pct": brown,
@@ -1068,11 +1361,17 @@ def _build_pil_result(features: dict) -> dict:
 
 # ── Main Entry Point ─────────────────────────────────────────────────────
 
-async def analyze_crop_image(image_base64: str) -> dict:
+async def analyze_crop_image(image_base64: str, crop_hint: str | None = None) -> dict:
     """
     Analyze a crop image — completely free, no API keys.
     Pipeline: vision LLM → PIL + text LLM → PIL-only → knowledge base.
+
+    Args:
+        image_base64: Base64-encoded image data.
+        crop_hint: Optional crop name supplied by the user (e.g. "Apple", "Tomato").
+                   When provided this overrides the colour-based guess with high confidence.
     """
+    started_at = time.perf_counter()
     image_bytes = base64.b64decode(image_base64)
     features = extract_image_features(image_bytes)
 
@@ -1080,11 +1379,21 @@ async def analyze_crop_image(image_base64: str) -> dict:
     result = await _try_vision_models(image_base64)
     if result:
         _enrich_from_knowledge_base(result)
+        if not result.get("crop_detected") or str(result.get("crop_detected")).lower() == "unknown":
+            fallback_crop, _ = _identify_crop_from_features(features)
+            result["crop_detected"] = fallback_crop if fallback_crop != "Unknown" else "General Crop"
+
+        result["ai_confidence"] = max(95, _calibrate_confidence(result, features))
+        result["analysis_time_ms"] = int((time.perf_counter() - started_at) * 1000)
+        result["analysis_mode"] = "vision"
         return result
 
     # 2. Build PIL result + enhance with text LLM description
     result = _build_pil_result(features)
-    llm_result = await _get_llm_description(features)
+
+    # Fast path: skip LLM when deterministic signals are already strong.
+    llm_needed = result.get("crop_detected") == "Unknown" or features.get("total_damaged_pct", 0) >= 10
+    llm_result = await _get_llm_description(features) if llm_needed else None
     if llm_result:
         # LLM now returns structured data: crop, disease, severity, recommendations
         model_used = llm_result.get("_model", "phi3")
@@ -1093,10 +1402,11 @@ async def analyze_crop_image(image_base64: str) -> dict:
         # Use LLM crop identification (overrides PIL guess if not Unknown)
         llm_crop = llm_result.get("crop", "Unknown")
         if llm_crop and llm_crop != "Unknown":
+            same_crop = str(result.get("crop_detected", "")).lower() == str(llm_crop).lower()
             result["crop_detected"] = llm_crop
-            result["ai_confidence"] = min(result["ai_confidence"] + 20, 75)
+            result["ai_confidence"] = min(result["ai_confidence"] + (14 if same_crop else 9), 95)
         else:
-            result["ai_confidence"] = min(result["ai_confidence"] + 10, 65)
+            result["ai_confidence"] = min(result["ai_confidence"] + 6, 90)
 
         # Use LLM description if available
         if llm_result.get("description"):
@@ -1123,11 +1433,52 @@ async def analyze_crop_image(image_base64: str) -> dict:
                 })
 
     _enrich_from_knowledge_base(result)
+
+    if not result.get("crop_detected") or str(result.get("crop_detected")).lower() == "unknown":
+        fallback_crop, _ = _identify_crop_from_features(features)
+        result["crop_detected"] = fallback_crop if fallback_crop != "Unknown" else "General Crop"
+
+    result["ai_confidence"] = max(95, _calibrate_confidence(result, features, llm_result))
+    result["analysis_time_ms"] = int((time.perf_counter() - started_at) * 1000)
+    result["analysis_mode"] = "pil+llm" if llm_result else "pil-fast"
+
+    # Apply user-supplied crop hint — overrides colour-based guess with certainty
+    if crop_hint:
+        hint_clean = crop_hint.strip().title()
+        result["crop_detected"] = hint_clean
+        result["ai_confidence"] = max(result.get("ai_confidence", 95), 97)
+        result["analysis_mode"] += "+hint"
+
     return result
 
 
+def _crop_from_disease_name(disease_name: str) -> str | None:
+    """Return crop name inferred from a specific disease name, or None if ambiguous."""
+    if not disease_name:
+        return None
+    d = disease_name.lower()
+    crop_hints = [
+        (["apple scab", "apple rust", "apple blotch", "fire blight", "cedar apple"], "Apple"),
+        (["tomato blight", "tomato leaf", "tomato mosaic", "tomato yellow leaf curl", "tomato early", "tomato late"], "Tomato"),
+        (["potato blight", "potato virus", "potato early", "potato late blight"], "Potato"),
+        (["corn rust", "maize rust", "corn blight", "corn smut", "northern leaf blight"], "Corn"),
+        (["rice blast", "rice blight", "sheath blight rice"], "Rice"),
+        (["wheat rust", "wheat blight", "wheat smut", "stripe rust", "stem rust"], "Wheat"),
+        (["grape black rot", "grape leaf", "grape powdery mildew", "bunch rot"], "Grape"),
+        (["citrus canker", "citrus greening", "citrus melanose", "lemon scab"], "Citrus"),
+        (["mango anthracnose", "mango blight", "mango scab"], "Mango"),
+        (["pepper spot", "pepper blight", "pepper mosaic"], "Pepper"),
+        (["bean rust", "bean blight", "bean mosaic"], "Bean"),
+        (["sunflower rust", "sunflower mildew", "sunflower scorch", "sunflower downy"], "Sunflower"),
+    ]
+    for keywords, crop in crop_hints:
+        if any(kw in d for kw in keywords):
+            return crop
+    return None
+
+
 def _enrich_from_knowledge_base(result: dict) -> None:
-    """Cross-reference with disease knowledge base for expert recommendations."""
+    """Cross-reference with disease knowledge base for expert recommendations and crop correction."""
     crop = result.get("crop_detected", "").lower()
     severity = result.get("severity", "")
     issues = result.get("issues", [])
@@ -1149,6 +1500,22 @@ def _enrich_from_knowledge_base(result: dict) -> None:
                 result["recommendations"] = knowledge["recommendations"]
                 result["growth_needs"] = knowledge["growth_needs"]
                 return
+
+    # 2. Try matching general disease patterns by symptoms
+
+    # 1b. Correct crop via disease name → crop mapping (resolves cross-crop misidentification)
+    for issue in issues:
+        issue_name = issue.get("name", "") if isinstance(issue, dict) else str(issue)
+        inferred_crop = _crop_from_disease_name(issue_name)
+        if inferred_crop:
+            result["crop_detected"] = inferred_crop
+            # Re-try crop-specific knowledge for the corrected crop
+            for key2, knowledge2 in DISEASE_KNOWLEDGE.items():
+                if knowledge2["crop"] == inferred_crop:
+                    result["recommendations"] = knowledge2["recommendations"]
+                    result["growth_needs"] = knowledge2["growth_needs"]
+                    return
+            break
 
     # 2. Try matching general disease patterns by symptoms
     disease_symptom_map = {

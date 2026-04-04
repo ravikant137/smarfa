@@ -1,8 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function GradientHeader({ subtitle }) {
+  const staticSubtitle = 'Smart AI Farming';
+
   return (
     <View style={styles.outer}>
       <LinearGradient
@@ -12,8 +15,11 @@ export default function GradientHeader({ subtitle }) {
         style={styles.gradient}
       >
         <View style={styles.content}>
-          <Text style={styles.title}>Smarfa</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
+          <View style={styles.brandRow}>
+            <MaterialCommunityIcons name="leaf-circle" size={34} color="#FFFFFF" />
+            <Text style={styles.title}>Smarfa</Text>
+          </View>
+          <Text style={styles.subtitle}>{staticSubtitle}</Text>
         </View>
       </LinearGradient>
     </View>
@@ -34,6 +40,11 @@ const styles = StyleSheet.create({
   },
   content: {
     alignItems: 'center',
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
     color: '#FFFFFF',

@@ -319,6 +319,27 @@ button{font-family:inherit}
         <button class="btn btn-outline" onclick="clearScan()">Clear</button>
       </div>
 
+      <div style="margin-top:10px;">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">🌿 Which crop are you scanning? <span style="opacity:.6">(optional — improves accuracy)</span></label>
+        <select id="crop-hint-select" style="width:100%;background:#1E293B;color:#E2E8F0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px 12px;font-size:13px;outline:none;">
+          <option value="">— Let AI decide —</option>
+          <option value="Apple">🍎 Apple</option>
+          <option value="Tomato">🍅 Tomato</option>
+          <option value="Potato">🥔 Potato</option>
+          <option value="Corn">🌽 Corn / Maize</option>
+          <option value="Rice">🌾 Rice</option>
+          <option value="Wheat">🌾 Wheat</option>
+          <option value="Grape">🍇 Grape</option>
+          <option value="Sunflower">🌻 Sunflower</option>
+          <option value="Citrus">🍊 Citrus / Orange</option>
+          <option value="Mango">🥭 Mango</option>
+          <option value="Pepper">🌶️ Pepper / Chili</option>
+          <option value="Bean">🫘 Bean / Soybean</option>
+          <option value="Banana">🍌 Banana</option>
+          <option value="Sugarcane">🎋 Sugarcane</option>
+        </select>
+      </div>
+
       <div id="scan-loading" class="loading-overlay" style="display:none">
         <div class="spinner"></div>
         <p>AI is analyzing your crop...</p>
@@ -374,6 +395,11 @@ button{font-family:inherit}
           <div class="report-metric"><span class="label">Total Alerts</span><span class="val" id="r-alert-count">0</span></div>
           <div class="report-metric"><span class="label">All-Time Alerts</span><span class="val" id="r-alert-total">0</span></div>
           <div class="alert-breakdown" id="r-alert-types"></div>
+        </div>
+
+        <div class="result-card" id="scan-history-card" style="display:none">
+          <h3>🔬 Recent AI Scans</h3>
+          <div id="r-scan-list"></div>
         </div>
 
       </div>
@@ -671,7 +697,10 @@ async function analyzeCrop() {
   var results = document.getElementById('scan-results');
   btn.disabled = true; loading.style.display = 'flex'; results.style.display = 'none';
   try {
-    var r = await fetch(API + '/analyze_crop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ image_base64: imageBase64 }) });
+    var cropHint = (document.getElementById('crop-hint-select') || {}).value || '';
+    var payload = { image_base64: imageBase64 };
+    if (cropHint) payload.crop_hint = cropHint;
+    var r = await fetch(API + '/analyze_crop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     var d = await r.json();
     if (!r.ok) throw new Error(d.detail || 'Analysis failed');
     renderResults(d);
@@ -769,6 +798,23 @@ async function loadReports() {
       return '<div class="alert-type-badge" style="border-color:' + (typeColors[e[0]]||'var(--border)') + ';color:' + (typeColors[e[0]]||'var(--muted)') + '">' + e[0].replace(/_/g,' ') + ': ' + e[1] + '</div>';
     }).join('') : '<span style="color:var(--muted);font-size:13px">No alerts this week</span>';
 
+    // Recent AI Scans
+    if (d.recent_scans && d.recent_scans.length) {
+      var sevColors = {healthy:'var(--green)',warning:'var(--yellow)',critical:'var(--red)'};
+      var sevIcons = {healthy:'✅',warning:'⚠️',critical:'🚨'};
+      document.getElementById('scan-history-card').style.display = 'block';
+      document.getElementById('r-scan-list').innerHTML = d.recent_scans.map(function(s) {
+        var col = sevColors[s.severity] || 'var(--muted)';
+        var ico = sevIcons[s.severity] || '🔬';
+        return '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start">' +
+          '<div style="border-left:3px solid ' + col + ';padding-left:10px;flex:1">' +
+          '<div style="font-weight:600;font-size:14px">' + ico + ' ' + esc(s.crop_detected) + ' <span style="font-size:11px;color:' + col + ';font-weight:700">' + (s.severity||'').toUpperCase() + '</span></div>' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + s.ai_confidence + '% confidence · ' + new Date(s.timestamp).toLocaleString() + '</div>' +
+          (s.health_assessment ? '<div style="font-size:12px;color:var(--text);margin-top:4px;line-height:1.5">' + esc(s.health_assessment) + '</div>' : '') +
+          '</div></div>';
+      }).join('');
+    }
+
     content.style.display = 'block';
   } catch(e) {
     content.innerHTML = '<div class="empty-state"><div class="icon">\uD83D\uDCCA</div><p>No report data yet. Send sensor data to see reports.</p></div>';
@@ -789,23 +835,46 @@ function renderTrend(barId, labelId, data, key, max) {
 // ── Alerts ──────────────────────────────────
 async function loadAlerts() {
   var el = document.getElementById('alerts-list');
+  el.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><p>Loading alerts...</p></div>';
   try {
-    var r = await fetch(API + '/alerts');
-    var data = await r.json();
-    if (!data.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">\uD83D\uDD14</div><p>No alerts yet \u2014 your farm is looking good!</p></div>';
+    var results = await Promise.all([
+      fetch(API + '/alerts').then(function(r){ return r.json(); }).catch(function(){ return []; }),
+      fetch(API + '/scan_history?limit=20').then(function(r){ return r.json(); }).catch(function(){ return []; }),
+    ]);
+    var sysAlerts = results[0] || [];
+    var scans = results[1] || [];
+
+    // Convert scans to alert-shaped objects (scans already create Alert rows, so avoid duplicates:
+    // only show scans not already in sysAlerts as crop_ types)
+    var hasScanAlerts = sysAlerts.some(function(a){ return a.type && a.type.startsWith('crop_'); });
+    var extra = [];
+    if (!hasScanAlerts) {
+      extra = scans.map(function(s, i) {
+        return { id: 'scan_' + s.id, type: 'crop_' + (s.severity||'warning'), message: s.crop_detected + ' — ' + (s.severity||'').toUpperCase() + ' detected at ' + s.ai_confidence + '% confidence. ' + (s.health_assessment||''), timestamp: s.timestamp, _isScan: true };
+      });
+    }
+
+    var all = sysAlerts.concat(extra).sort(function(a, b){ return new Date(b.timestamp) - new Date(a.timestamp); });
+
+    if (!all.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">🔔</div><p>No alerts yet — your farm is looking good!</p></div>';
       return;
     }
-    el.innerHTML = data.map(function(a) {
-      var typeClass = a.type || '';
-      var icons = {moisture_warning:'\uD83D\uDCA7',temp_warning:'\uD83C\uDF21\uFE0F',growth_drop:'\uD83D\uDCC9',growth_slow:'\uD83D\uDC0C',intrusion_alarm:'\uD83D\uDEA8',pump_auto_start:'\uD83D\uDCA7'};
-      var icon = icons[a.type] || '\u26A0\uFE0F';
-      return '<div class="alert-item ' + esc(typeClass) + '">' +
-        '<div style="display:flex;align-items:center"><span class="time">' + icon + ' ' + new Date(a.timestamp).toLocaleString() + '</span><span class="type-tag">' + esc(a.type||'alert') + '</span></div>' +
-        '<div class="msg">' + esc(a.message) + '</div></div>';
+
+    var typeColors = {crop_healthy:'var(--green)',crop_warning:'var(--yellow)',crop_critical:'var(--red)',moisture_warning:'var(--blue)',temp_warning:'var(--red)',intrusion_alarm:'var(--red)',pump_auto_start:'var(--cyan)',growth_drop:'var(--yellow)',growth_slow:'var(--yellow)'};
+    var icons = {crop_healthy:'🌿',crop_warning:'⚠️',crop_critical:'🚨',moisture_warning:'💧',temp_warning:'🌡️',growth_drop:'📉',growth_slow:'🐌',intrusion_alarm:'🚨',pump_auto_start:'💧'};
+
+    el.innerHTML = all.map(function(a) {
+      var col = typeColors[a.type] || 'var(--yellow)';
+      var ico = icons[a.type] || '⚠️';
+      var badge = a._isScan ? '<span class="type-tag" style="background:rgba(168,85,247,.15);color:var(--purple)">AI SCAN</span>' : '<span class="type-tag">' + esc(a.type||'alert') + '</span>';
+      return '<div class="alert-item ' + esc(a.type||'') + '" style="border-left-color:' + col + '">' +
+        '<div style="display:flex;align-items:center">' +
+        '<span class="time">' + ico + ' ' + new Date(a.timestamp).toLocaleString() + '</span>' + badge +
+        '</div><div class="msg">' + esc(a.message) + '</div></div>';
     }).join('');
   } catch(e) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">\u26A0\uFE0F</div><p>Could not load alerts</p></div>';
+    el.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Could not load alerts</p></div>';
   }
 }
 

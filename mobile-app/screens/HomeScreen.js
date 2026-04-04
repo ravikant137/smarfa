@@ -46,7 +46,7 @@ export default function HomeScreen({ navigation }) {
 
         <AnimatedButton title="Scan Crop Health" onPress={() => navigation.navigate('Crop Scan')} colors={['#10B981', '#059669']} />
         <AnimatedButton title="View Expert Alerts" onPress={() => navigation.navigate('Alerts')} colors={['#3B82F6', '#2563EB']} />
-        <AnimatedButton title="Report Issue" onPress={() => alert('Contact support for immediate assistance')} colors={['#F59E0B', '#D97706']} />
+        <AnimatedButton title="Open Reports" onPress={() => navigation.navigate('Reports')} colors={['#F59E0B', '#D97706']} />
 
         <Text style={styles.tip}>
           <Ionicons name="bulb" size={16} color="#FCD34D" /> Tip: Monitor alerts daily for optimal yield. Our AI expert analyzes 30+ years of farming data.

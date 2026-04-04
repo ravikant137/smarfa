@@ -8,7 +8,7 @@ from pathlib import Path
 import bcrypt
 
 from app.database import init_db, get_session
-from app.models import CropData, IntrusionEvent, Alert, User, WaterPumpLog
+from app.models import CropData, IntrusionEvent, Alert, User, WaterPumpLog, ScanHistory
 from app.sensors import process_growth_reading, process_intrusion_reading
 from app.config import settings
 from app.mobile import register_device, list_devices, send_push
@@ -145,14 +145,155 @@ async def mobile_send_push(payload: MobilePush):
 
 class CropImagePayload(BaseModel):
     image_base64: str
+    crop_hint: str | None = None
 
 
 @app.post("/analyze_crop")
 async def analyze_crop(payload: CropImagePayload):
     if not payload.image_base64:
         raise HTTPException(status_code=400, detail="No image provided")
-    result = await analyze_crop_image(payload.image_base64)
+    session = get_session()
+    result = await analyze_crop_image(payload.image_base64, crop_hint=payload.crop_hint or None)
+
+    now = datetime.utcnow()
+    severity = str(result.get("severity") or "warning")
+    crop_name = str(result.get("crop_detected") or "General Crop")
+    health_txt = str(result.get("health_assessment") or "")
+    confidence = float(result.get("ai_confidence") or 95.0)
+
+    scan = ScanHistory(
+        timestamp=now,
+        crop_detected=crop_name,
+        severity=severity,
+        ai_confidence=confidence,
+        health_assessment=health_txt,
+        model_used=str(result.get("_model") or "unknown"),
+    )
+    session.add(scan)
+
+    # Create an alert for every crop scan so it shows on Alerts screen
+    alert_type = f"crop_{severity}"
+    snippet = health_txt[:220] if health_txt else f"{crop_name} requires attention."
+    alert_msg = f"[Crop Scan] {crop_name} — {severity.upper()} | Confidence: {confidence:.0f}%. {snippet}"
+    alert = Alert(
+        crop_id="crop_scan",
+        type=alert_type,
+        message=alert_msg,
+        timestamp=now,
+    )
+    session.add(alert)
+    session.commit()
     return result
+
+
+@app.get("/scan_history")
+async def scan_history(limit: int = 20):
+    session = get_session()
+    bounded = max(1, min(limit, 100))
+    rows = session.query(ScanHistory).order_by(ScanHistory.timestamp.desc()).limit(bounded).all()
+    return [
+        {
+            "id": r.id,
+            "timestamp": str(r.timestamp),
+            "crop_detected": r.crop_detected,
+            "severity": r.severity,
+            "ai_confidence": round(float(r.ai_confidence), 1),
+            "health_assessment": r.health_assessment,
+            "model_used": r.model_used,
+        }
+        for r in rows
+    ]
+
+
+@app.get("/reports/overview")
+async def reports_overview():
+    from datetime import timedelta
+    session = get_session()
+    now = datetime.utcnow()
+    week_ago = now - timedelta(days=7)
+
+    # Scan history
+    all_scans = session.query(ScanHistory).order_by(ScanHistory.timestamp.desc()).all()
+    recent_scans = [s for s in all_scans if s.timestamp >= week_ago]
+
+    unique_crops = len(set(s.crop_detected for s in all_scans))
+    avg_conf = 0.0
+    if recent_scans:
+        avg_conf = sum(s.ai_confidence for s in recent_scans) / len(recent_scans)
+        healthy_count = sum(1 for s in recent_scans if s.severity == "healthy")
+        health_score = int((healthy_count / len(recent_scans)) * 100)
+    else:
+        health_score = 0
+
+    # Alerts
+    recent_alerts = session.query(Alert).filter(Alert.timestamp >= week_ago).all()
+    total_alerts_all = session.query(Alert).count()
+    breakdown: dict = {}
+    for a in recent_alerts:
+        breakdown[a.type] = breakdown.get(a.type, 0) + 1
+
+    # Sensor data
+    sensor_data = session.query(CropData).filter(CropData.timestamp >= week_ago).all()
+    avg_temp = round(sum(s.temperature_c for s in sensor_data) / len(sensor_data), 1) if sensor_data else 0
+    avg_moisture = round(sum(s.soil_moisture for s in sensor_data) / len(sensor_data), 1) if sensor_data else 0
+    min_temp = round(min((s.temperature_c for s in sensor_data), default=0), 1)
+    max_temp = round(max((s.temperature_c for s in sensor_data), default=0), 1)
+    min_moisture = round(min((s.soil_moisture for s in sensor_data), default=0), 1)
+    avg_height = round(sum(s.height_cm for s in sensor_data) / len(sensor_data), 1) if sensor_data else 0
+    pump_count = session.query(WaterPumpLog).filter(WaterPumpLog.timestamp >= week_ago).count()
+
+    # Daily trends
+    daily_data: dict = {}
+    for r in sensor_data:
+        day = r.timestamp.strftime("%Y-%m-%d")
+        if day not in daily_data:
+            daily_data[day] = {"heights": [], "moistures": [], "temps": []}
+        daily_data[day]["heights"].append(r.height_cm)
+        daily_data[day]["moistures"].append(r.soil_moisture)
+        daily_data[day]["temps"].append(r.temperature_c)
+    trends = []
+    for day in sorted(daily_data.keys()):
+        dd = daily_data[day]
+        trends.append({
+            "date": day,
+            "avg_height": round(sum(dd["heights"]) / len(dd["heights"]), 1),
+            "avg_moisture": round(sum(dd["moistures"]) / len(dd["moistures"]), 1),
+            "avg_temp": round(sum(dd["temps"]) / len(dd["temps"]), 1),
+        })
+
+    return {
+        "health_score": health_score,
+        "total_crops": unique_crops,
+        "total_scans": len(all_scans),
+        "avg_confidence": round(avg_conf, 1),
+        "recent_scans": [
+            {
+                "id": s.id,
+                "timestamp": str(s.timestamp),
+                "crop_detected": s.crop_detected,
+                "severity": s.severity,
+                "ai_confidence": round(float(s.ai_confidence), 1),
+                "health_assessment": s.health_assessment[:120] if s.health_assessment else "",
+            }
+            for s in all_scans[:10]
+        ],
+        "week_summary": {
+            "alerts_count": len(recent_alerts),
+            "alerts_total": total_alerts_all,
+            "avg_temp": avg_temp,
+            "avg_moisture": avg_moisture,
+            "min_temp": min_temp,
+            "max_temp": max_temp,
+            "min_moisture": min_moisture,
+            "avg_height": avg_height,
+            "readings_count": len(sensor_data),
+            "pump_activations": pump_count,
+            "scan_count": len(recent_scans),
+            "avg_confidence": round(avg_conf, 1),
+        },
+        "alert_breakdown": breakdown,
+        "daily_trends": trends,
+    }
 
 
 # ── Water Pump Control ────────────────────────────────────────────────────
@@ -214,91 +355,6 @@ async def pump_logs():
     session = get_session()
     logs = session.query(WaterPumpLog).order_by(WaterPumpLog.timestamp.desc()).limit(50).all()
     return [{"id": l.id, "crop_id": l.crop_id, "timestamp": str(l.timestamp), "trigger": l.trigger, "reason": l.reason, "moisture_before": l.moisture_before, "duration": l.duration_seconds, "status": l.status} for l in logs]
-
-
-# ── Detailed Farm Reports ─────────────────────────────────────────────────
-@app.get("/reports/overview")
-async def reports_overview():
-    from sqlalchemy import func
-    session = get_session()
-    from datetime import timedelta
-    now = datetime.utcnow()
-    week_ago = now - timedelta(days=7)
-
-    # Sensor stats
-    recent_data = session.query(CropData).filter(CropData.timestamp >= week_ago).all()
-    total_alerts = session.query(Alert).filter(Alert.timestamp >= week_ago).count()
-    total_alerts_all = session.query(Alert).count()
-    pump_activations = session.query(WaterPumpLog).filter(WaterPumpLog.timestamp >= week_ago).count()
-
-    if recent_data:
-        avg_temp = round(sum(r.temperature_c for r in recent_data) / len(recent_data), 1)
-        avg_moisture = round(sum(r.soil_moisture for r in recent_data) / len(recent_data), 1)
-        avg_height = round(sum(r.height_cm for r in recent_data) / len(recent_data), 1)
-        min_moisture = round(min(r.soil_moisture for r in recent_data), 1)
-        max_temp = round(max(r.temperature_c for r in recent_data), 1)
-        min_temp = round(min(r.temperature_c for r in recent_data), 1)
-        crops = list(set(r.crop_id for r in recent_data))
-    else:
-        avg_temp = avg_moisture = avg_height = min_moisture = max_temp = min_temp = 0.0
-        crops = []
-
-    # Alert breakdown
-    alert_types = {}
-    alerts_week = session.query(Alert).filter(Alert.timestamp >= week_ago).all()
-    for a in alerts_week:
-        alert_types[a.type] = alert_types.get(a.type, 0) + 1
-
-    # Growth trend (last 7 days by day)
-    daily_data = {}
-    for r in recent_data:
-        day = r.timestamp.strftime("%Y-%m-%d")
-        if day not in daily_data:
-            daily_data[day] = {"heights": [], "moistures": [], "temps": []}
-        daily_data[day]["heights"].append(r.height_cm)
-        daily_data[day]["moistures"].append(r.soil_moisture)
-        daily_data[day]["temps"].append(r.temperature_c)
-
-    trends = []
-    for day in sorted(daily_data.keys()):
-        d = daily_data[day]
-        trends.append({
-            "date": day,
-            "avg_height": round(sum(d["heights"]) / len(d["heights"]), 1),
-            "avg_moisture": round(sum(d["moistures"]) / len(d["moistures"]), 1),
-            "avg_temp": round(sum(d["temps"]) / len(d["temps"]), 1),
-        })
-
-    # Health score (0-100)
-    health_score = 85
-    if avg_moisture < 30:
-        health_score -= 25
-    elif avg_moisture < 40:
-        health_score -= 10
-    if avg_temp > 38 or avg_temp < 10:
-        health_score -= 15
-    if total_alerts > 10:
-        health_score -= 20
-    elif total_alerts > 5:
-        health_score -= 10
-    health_score = max(0, min(100, health_score))
-
-    return {
-        "health_score": health_score,
-        "total_crops": len(crops),
-        "crops": crops,
-        "week_summary": {
-            "avg_temp": avg_temp, "min_temp": min_temp, "max_temp": max_temp,
-            "avg_moisture": avg_moisture, "min_moisture": min_moisture,
-            "avg_height": avg_height,
-            "alerts_count": total_alerts,
-            "alerts_total": total_alerts_all,
-            "pump_activations": pump_activations,
-            "readings_count": len(recent_data),
-        },
-        "alert_breakdown": alert_types,
-        "daily_trends": trends,
-    }
 
 
 # ── Ollama status endpoint ────────────────────────────────────────────────
