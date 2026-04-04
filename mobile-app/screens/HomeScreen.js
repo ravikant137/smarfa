@@ -44,7 +44,8 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        <AnimatedButton title="View Expert Alerts" onPress={() => navigation.navigate('Alerts')} colors={['#10B981', '#059669']} />
+        <AnimatedButton title="Scan Crop Health" onPress={() => navigation.navigate('Crop Scan')} colors={['#10B981', '#059669']} />
+        <AnimatedButton title="View Expert Alerts" onPress={() => navigation.navigate('Alerts')} colors={['#3B82F6', '#2563EB']} />
         <AnimatedButton title="Report Issue" onPress={() => alert('Contact support for immediate assistance')} colors={['#F59E0B', '#D97706']} />
 
         <Text style={styles.tip}>

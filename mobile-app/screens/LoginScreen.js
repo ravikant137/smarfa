@@ -27,7 +27,7 @@ export default function LoginScreen({ navigation }) {
       });
       setLoading(false);
       if (response.data?.status === 'login successful') {
-        navigation.navigate('Home');
+        navigation.navigate('Home', { username: email.trim(), userId: response.data.user_id });
       }
     } catch (err) {
       setLoading(false);

@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smarfa — Smart AI Farming</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0F172A;--surface:#1E293B;--card:#334155;--border:#475569;
+  --green:#10B981;--green-l:#34D399;--green-d:#065F46;
+  --yellow:#F59E0B;--red:#EF4444;--blue:#3B82F6;--purple:#8B5CF6;--cyan:#06B6D4;
+  --text:#F1F5F9;--muted:#94A3B8;--white:#fff;
+  --radius:14px;--radius-sm:10px;
+  --shadow:0 4px 24px rgba(0,0,0,.25);
+}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+a{color:var(--green);text-decoration:none}
+button{font-family:inherit}
+
+/* ── Full-screen auth overlay ──────── */
+.auth-screen{position:fixed;inset:0;z-index:1000;background:var(--bg);display:flex;align-items:center;justify-content:center;transition:opacity .4s,visibility .4s}
+.auth-screen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.auth-container{width:100%;max-width:400px;padding:32px 24px}
+.auth-logo-wrap{text-align:center;margin-bottom:32px}
+.auth-logo-wrap .logo-icon{font-size:56px;display:block;margin-bottom:8px}
+.auth-logo-wrap h1{font-size:32px;font-weight:800;background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.auth-logo-wrap p{color:var(--muted);font-size:14px;margin-top:6px}
+.auth-tabs{display:flex;background:var(--surface);border-radius:var(--radius);padding:4px;margin-bottom:24px}
+.auth-tabs button{flex:1;padding:10px;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;transition:.2s;color:var(--muted);background:transparent}
+.auth-tabs button.active{background:var(--green);color:var(--white)}
+.auth-form{display:none}.auth-form.active{display:block}
+.form-group{margin-bottom:16px}
+.form-group label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px;font-weight:500}
+.form-group input{width:100%;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;outline:none;transition:.2s}
+.form-group input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(16,185,129,.2)}
+.form-group input::placeholder{color:var(--card)}
+.btn{width:100%;padding:14px;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;transition:.2s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-primary{background:linear-gradient(135deg,var(--green),var(--green-l));color:var(--white)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(16,185,129,.35)}
+.btn-outline{background:transparent;color:var(--green);border:1.5px solid var(--green)}
+.btn-outline:hover{background:rgba(16,185,129,.08)}
+.btn-sm{padding:10px 16px;width:auto;font-size:13px;border-radius:8px}
+.btn-danger{background:var(--red);color:var(--white)}
+.btn-danger:hover{opacity:.9}
+.btn-warn{background:var(--yellow);color:#000}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+.error-msg{color:var(--red);font-size:13px;margin-top:10px;text-align:center;min-height:20px}
+
+/* ── App Layout ───────────────────── */
+.app{max-width:520px;margin:0 auto;min-height:100vh;display:none;flex-direction:column;position:relative}
+.app.visible{display:flex}
+.header{background:linear-gradient(135deg,var(--green-d),var(--green));padding:18px 24px;text-align:center;position:sticky;top:0;z-index:100}
+.header h1{font-size:22px;font-weight:700;color:var(--white);display:flex;align-items:center;justify-content:center;gap:8px}
+.header p{font-size:12px;color:#D1FAE5;margin-top:2px}
+
+.nav{display:flex;background:var(--surface);border-top:1px solid var(--border);position:sticky;bottom:0;z-index:100}
+.nav button{flex:1;padding:10px 0 8px;background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.2s;position:relative}
+.nav button.active{color:var(--green)}
+.nav button.active::after{content:'';position:absolute;top:0;left:25%;right:25%;height:2px;background:var(--green);border-radius:0 0 4px 4px}
+.nav svg{width:20px;height:20px}
+
+.content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.tab{display:none}.tab.active{display:block}
+
+/* ── Dashboard ────────────────────── */
+.health-ring{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;position:relative}
+.health-ring .score{font-size:36px;font-weight:800}
+.welcome-banner{background:linear-gradient(135deg,var(--green-d),var(--green));border-radius:var(--radius);padding:20px;margin-bottom:16px;position:relative;overflow:hidden}
+.welcome-banner::after{content:'🌾';position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:48px;opacity:.3}
+.welcome-banner h2{font-size:18px;color:var(--white)}
+.welcome-banner p{color:#D1FAE5;font-size:13px;margin-top:4px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stat-card{background:var(--surface);border-radius:var(--radius-sm);padding:14px;border:1px solid var(--border);transition:.2s}
+.stat-card:hover{border-color:var(--green);transform:translateY(-2px)}
+.stat-card .icon{font-size:24px;margin-bottom:6px}
+.stat-card .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.stat-card .value{font-size:20px;font-weight:700;margin-top:2px}
+.stat-card .sub{font-size:11px;color:var(--muted);margin-top:2px}
+.section-title{font-size:16px;font-weight:700;margin:20px 0 12px;display:flex;align-items:center;gap:8px}
+.quick-actions{display:flex;flex-direction:column;gap:8px}
+.action-btn{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;cursor:pointer;transition:.2s;color:var(--text);font-size:14px;font-weight:500}
+.action-btn:hover{border-color:var(--green);background:rgba(16,185,129,.05);transform:translateX(4px)}
+.action-btn .icon{font-size:20px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:rgba(16,185,129,.1);border-radius:10px}
+
+/* ── Pump Control ─────────────────── */
+.pump-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:12px}
+.pump-status{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.pump-indicator{width:16px;height:16px;border-radius:50%;flex-shrink:0}
+.pump-indicator.on{background:var(--green);box-shadow:0 0 12px rgba(16,185,129,.6);animation:pulse-green 1.5s infinite}
+.pump-indicator.off{background:var(--card)}
+@keyframes pulse-green{0%,100%{box-shadow:0 0 8px rgba(16,185,129,.4)}50%{box-shadow:0 0 20px rgba(16,185,129,.8)}}
+.pump-btns{display:flex;gap:10px}
+.pump-btns .btn{flex:1}
+.pump-log{margin-top:16px}
+.pump-log-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+.pump-log-item:last-child{border-bottom:none}
+.pump-tag{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600}
+.pump-tag.auto{background:rgba(6,182,212,.15);color:var(--cyan)}
+.pump-tag.manual{background:rgba(139,92,246,.15);color:var(--purple)}
+
+/* ── Crop Scan ────────────────────── */
+.scan-area{border:2px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:.2s;background:var(--surface);margin-bottom:16px;position:relative;overflow:hidden}
+.scan-area:hover{border-color:var(--green);background:rgba(16,185,129,.03)}
+.scan-area.has-image{padding:0;border-style:solid;border-color:var(--green)}
+.scan-area img{width:100%;max-height:280px;object-fit:contain;display:block}
+.scan-area .placeholder{color:var(--muted)}
+.scan-area .placeholder .icon{font-size:44px;margin-bottom:10px}
+.scan-area .placeholder p{font-size:13px}
+.scan-btns{display:flex;gap:10px;margin-bottom:16px}
+.scan-btns .btn{flex:1;font-size:14px;padding:12px}
+
+/* ── Results ──────────────────────── */
+.result-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:18px;margin-bottom:10px}
+.result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.severity-badge{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.severity-badge.healthy{background:rgba(16,185,129,.15);color:var(--green)}
+.severity-badge.warning{background:rgba(245,158,11,.15);color:var(--yellow)}
+.severity-badge.critical{background:rgba(239,68,68,.15);color:var(--red)}
+.result-card h3{font-size:15px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.result-card p{font-size:13px;color:var(--muted);line-height:1.6}
+.rec-list{list-style:none;padding:0}
+.rec-list li{padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5;display:flex;gap:8px}
+.rec-list li:last-child{border-bottom:none}
+.rec-list li::before{content:'✅';flex-shrink:0}
+.issue-item{padding:10px 12px;background:rgba(239,68,68,.06);border-radius:8px;margin-bottom:8px;border-left:3px solid var(--red)}
+.issue-item h4{color:var(--red);font-size:13px;margin-bottom:3px}
+.issue-item p{font-size:12px;color:var(--muted)}
+.confidence-bar{height:6px;background:var(--card);border-radius:3px;margin-top:8px;overflow:hidden}
+.confidence-fill{height:100%;border-radius:3px;transition:width .6s}
+.model-badge{font-size:10px;background:var(--card);padding:3px 8px;border-radius:6px;color:var(--muted)}
+
+/* ── Reports ──────────────────────── */
+.report-section{margin-bottom:20px}
+.report-metric{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.report-metric:last-child{border-bottom:none}
+.report-metric .label{color:var(--muted);font-size:13px}
+.report-metric .val{font-size:15px;font-weight:600}
+.trend-bar{display:flex;align-items:end;gap:4px;height:60px;margin-top:8px}
+.trend-col{flex:1;background:rgba(16,185,129,.2);border-radius:4px 4px 0 0;transition:height .4s;position:relative;min-height:4px;cursor:pointer}
+.trend-col:hover{background:rgba(16,185,129,.5)}
+.trend-col .tip{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:10px;white-space:nowrap;z-index:10}
+.trend-col:hover .tip{display:block}
+.trend-labels{display:flex;gap:4px;margin-top:4px}
+.trend-labels span{flex:1;text-align:center;font-size:9px;color:var(--muted)}
+.alert-breakdown{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.alert-type-badge{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;background:var(--surface);border:1px solid var(--border)}
+
+/* ── Alerts ───────────────────────── */
+.alert-item{background:var(--surface);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px;border-left:3px solid var(--yellow);border:1px solid var(--border);position:relative}
+.alert-item.pump_auto_start{border-left-color:var(--cyan)}
+.alert-item.moisture_warning{border-left-color:var(--blue)}
+.alert-item.temp_warning{border-left-color:var(--red)}
+.alert-item.intrusion_alarm{border-left-color:var(--red)}
+.alert-item .time{font-size:11px;color:var(--muted)}
+.alert-item .type-tag{font-size:10px;padding:2px 8px;border-radius:4px;background:var(--card);color:var(--muted);margin-left:8px;text-transform:uppercase;font-weight:600}
+.alert-item .msg{font-size:13px;margin-top:6px;line-height:1.5}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-state .icon{font-size:48px;margin-bottom:12px}
+
+/* ── Profile ──────────────────────── */
+.profile-header{text-align:center;padding:24px 0}
+.avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--green-d),var(--green));display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 12px;color:var(--white);font-weight:700;box-shadow:0 4px 16px rgba(16,185,129,.3)}
+.profile-header h2{font-size:20px}
+.profile-header p{color:var(--muted);font-size:13px}
+.info-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;margin-bottom:16px}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-row .label{color:var(--muted);font-size:13px}
+.info-row .value{font-size:13px;font-weight:500}
+
+/* ── Spinner ──────────────────────── */
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid rgba(255,255,255,.3);border-top-color:var(--white);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay{display:flex;flex-direction:column;align-items:center;gap:12px;padding:40px;color:var(--muted)}
+
+/* ── Toast ────────────────────────── */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-100px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 20px;font-size:14px;z-index:2000;transition:transform .3s;box-shadow:var(--shadow);max-width:90%}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{border-color:var(--green);color:var(--green)}
+.toast.error{border-color:var(--red);color:var(--red)}
+
+/* ── Responsive ───────────────────── */
+@media(min-width:768px){
+  .app{border-left:1px solid var(--border);border-right:1px solid var(--border)}
+  .stat-grid{grid-template-columns:1fr 1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     AUTH SCREEN — full-screen overlay, hides everything behind it
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-container">
+    <div class="auth-logo-wrap">
+      <span class="logo-icon">🌱</span>
+      <h1>Smarfa</h1>
+      <p>Smart AI Farming — Protect &amp; Grow Your Crops</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="active" onclick="showAuthTab('login')">Sign In</button>
+      <button onclick="showAuthTab('register')">Register</button>
+    </div>
+
+    <!-- Login Form -->
+    <div class="auth-form active" id="form-login">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="login-user" placeholder="Enter your username" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-pass" placeholder="Enter your password" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" id="login-btn" onclick="doLogin()">
+        <span id="login-btn-text">Sign In</span>
+      </button>
+      <div class="error-msg" id="login-error"></div>
+    </div>
+
+    <!-- Register Form -->
+    <div class="auth-form" id="form-register">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="reg-user" placeholder="Choose a username" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="reg-pass" placeholder="Create a password" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="reg-pass2" placeholder="Confirm your password" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary" id="reg-btn" onclick="doRegister()">
+        <span id="reg-btn-text">Create Account</span>
+      </button>
+      <div class="error-msg" id="reg-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MAIN APP — hidden until login
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="app" id="app">
+  <div class="header">
+    <h1>🌱 Smarfa</h1>
+    <p>Smart AI Farming Dashboard</p>
+  </div>
+
+  <div class="content">
+    <!-- ── Tab: Dashboard ─────────── -->
+    <div class="tab active" id="tab-dashboard">
+      <div class="welcome-banner">
+        <h2>Welcome, <span id="dash-username">Farmer</span> 👋</h2>
+        <p>Your crops are monitored 24/7 with AI</p>
+      </div>
+
+      <div id="health-score-wrap" style="text-align:center;margin-bottom:16px">
+        <div class="health-ring" id="health-ring" style="background:conic-gradient(var(--green) 0deg, var(--green) 0deg, var(--card) 0deg)">
+          <span class="score" id="health-score">—</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px">Farm Health Score</div>
+      </div>
+
+      <div class="stat-grid" id="dash-stats">
+        <div class="stat-card"><div class="icon">🌡️</div><div class="label">Temperature</div><div class="value" id="s-temp">—</div><div class="sub" id="s-temp-sub"></div></div>
+        <div class="stat-card"><div class="icon">💧</div><div class="label">Soil Moisture</div><div class="value" id="s-moisture">—</div><div class="sub" id="s-moisture-sub"></div></div>
+        <div class="stat-card"><div class="icon">📏</div><div class="label">Avg Height</div><div class="value" id="s-height">—</div><div class="sub" id="s-height-sub"></div></div>
+        <div class="stat-card"><div class="icon">🚨</div><div class="label">Alerts (7d)</div><div class="value" id="s-alerts">—</div><div class="sub" id="s-alerts-sub"></div></div>
+      </div>
+
+      <!-- Water Pump Status -->
+      <div class="section-title">💧 Water Pump Control</div>
+      <div class="pump-card" id="pump-card">
+        <div class="pump-status">
+          <div class="pump-indicator off" id="pump-indicator"></div>
+          <div>
+            <div id="pump-status-text" style="font-weight:600;font-size:14px">Pump Offline</div>
+            <div id="pump-status-detail" style="font-size:12px;color:var(--muted)">No active irrigation</div>
+          </div>
+        </div>
+        <div class="pump-btns">
+          <button class="btn btn-primary btn-sm" onclick="startPump()">💧 Start Pump</button>
+          <button class="btn btn-danger btn-sm" onclick="stopPump()">⏹ Stop Pump</button>
+        </div>
+        <div class="pump-log" id="pump-log"></div>
+      </div>
+
+      <div class="section-title">⚡ Quick Actions</div>
+      <div class="quick-actions">
+        <div class="action-btn" onclick="switchTab('scan')"><span class="icon">📸</span>Scan Crop Health with AI</div>
+        <div class="action-btn" onclick="switchTab('reports')"><span class="icon">📊</span>View Detailed Reports</div>
+        <div class="action-btn" onclick="switchTab('alerts')"><span class="icon">🔔</span>View Alerts</div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Crop Scan ──────────── -->
+    <div class="tab" id="tab-scan">
+      <div class="section-title">🔬 AI Crop Scanner</div>
+      <div id="ai-banner" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px;font-size:12px;color:var(--yellow);line-height:1.5"></div>
+
+      <div class="scan-area" id="scan-area" onclick="document.getElementById('file-input').click()">
+        <div class="placeholder" id="scan-placeholder">
+          <div class="icon">📷</div>
+          <p>Tap to upload or drag a crop photo</p>
+          <p style="font-size:11px;margin-top:8px;color:var(--card)">JPG, PNG — close-up of leaves works best</p>
+        </div>
+        <img id="scan-preview" style="display:none" alt="Crop preview">
+      </div>
+      <input type="file" id="file-input" accept="image/*" style="display:none" capture="environment">
+
+      <div class="scan-btns">
+        <button class="btn btn-primary" id="analyze-btn" disabled onclick="analyzeCrop()">🔬 Analyze</button>
+        <button class="btn btn-outline" onclick="clearScan()">Clear</button>
+      </div>
+
+      <div id="scan-loading" class="loading-overlay" style="display:none">
+        <div class="spinner"></div>
+        <p>AI is analyzing your crop...</p>
+      </div>
+
+      <div id="scan-results" style="display:none"></div>
+    </div>
+
+    <!-- ── Tab: Reports ────────────── -->
+    <div class="tab" id="tab-reports">
+      <div class="section-title">📊 Farm Reports</div>
+      <div id="reports-loading" class="loading-overlay"><div class="spinner"></div><p>Loading reports...</p></div>
+      <div id="reports-content" style="display:none">
+
+        <div class="result-card">
+          <h3>🏥 Overall Farm Health</h3>
+          <div style="text-align:center;padding:16px 0">
+            <div class="health-ring" id="report-health-ring" style="background:conic-gradient(var(--green) 0deg, var(--card) 0deg)">
+              <span class="score" id="report-health-score">—</span>
+            </div>
+          </div>
+          <div class="report-metric"><span class="label">Total Crops Monitored</span><span class="val" id="r-crops">0</span></div>
+          <div class="report-metric"><span class="label">Readings This Week</span><span class="val" id="r-readings">0</span></div>
+        </div>
+
+        <div class="result-card">
+          <h3>🌡️ Temperature Analysis</h3>
+          <div class="report-metric"><span class="label">Average</span><span class="val" id="r-avg-temp">—</span></div>
+          <div class="report-metric"><span class="label">Minimum</span><span class="val" id="r-min-temp">—</span></div>
+          <div class="report-metric"><span class="label">Maximum</span><span class="val" id="r-max-temp">—</span></div>
+          <div class="trend-bar" id="trend-temp"></div>
+          <div class="trend-labels" id="trend-temp-labels"></div>
+        </div>
+
+        <div class="result-card">
+          <h3>💧 Soil Moisture Analysis</h3>
+          <div class="report-metric"><span class="label">Average Moisture</span><span class="val" id="r-avg-moisture">—</span></div>
+          <div class="report-metric"><span class="label">Lowest Recorded</span><span class="val" id="r-min-moisture">—</span></div>
+          <div class="report-metric"><span class="label">Auto Pump Activations</span><span class="val" id="r-pump-count">0</span></div>
+          <div class="trend-bar" id="trend-moisture"></div>
+          <div class="trend-labels" id="trend-moisture-labels"></div>
+        </div>
+
+        <div class="result-card">
+          <h3>📏 Growth Tracking</h3>
+          <div class="report-metric"><span class="label">Avg Height</span><span class="val" id="r-avg-height">—</span></div>
+          <div class="trend-bar" id="trend-height"></div>
+          <div class="trend-labels" id="trend-height-labels"></div>
+        </div>
+
+        <div class="result-card">
+          <h3>🚨 Alert Breakdown (7 Days)</h3>
+          <div class="report-metric"><span class="label">Total Alerts</span><span class="val" id="r-alert-count">0</span></div>
+          <div class="report-metric"><span class="label">All-Time Alerts</span><span class="val" id="r-alert-total">0</span></div>
+          <div class="alert-breakdown" id="r-alert-types"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Tab: Alerts ─────────────── -->
+    <div class="tab" id="tab-alerts">
+      <div class="section-title">🔔 Farm Alerts</div>
+      <div id="alerts-list">
+        <div class="loading-overlay"><div class="spinner"></div><p>Loading alerts...</p></div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Profile ────────────── -->
+    <div class="tab" id="tab-profile">
+      <div class="profile-header">
+        <div class="avatar" id="profile-avatar">F</div>
+        <h2 id="profile-name">Farmer</h2>
+        <p>Smart Farmer since 2026</p>
+      </div>
+      <div class="info-card">
+        <div class="info-row"><span class="label">Username</span><span class="value" id="profile-email">—</span></div>
+        <div class="info-row"><span class="label">Plan</span><span class="value" style="color:var(--green)">Free — AI Powered</span></div>
+        <div class="info-row"><span class="label">AI Engine</span><span class="value" id="profile-ai">Checking...</span></div>
+        <div class="info-row"><span class="label">Auto Irrigation</span><span class="value" style="color:var(--cyan)">✅ Enabled</span></div>
+      </div>
+      <button class="btn btn-danger" onclick="logout()">🚪 Sign Out</button>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="nav">
+    <button class="active" onclick="switchTab('dashboard')" data-tab="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home
+    </button>
+    <button onclick="switchTab('scan')" data-tab="scan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      Scan
+    </button>
+    <button onclick="switchTab('reports')" data-tab="reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      Reports
+    </button>
+    <button onclick="switchTab('alerts')" data-tab="alerts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      Alerts
+    </button>
+    <button onclick="switchTab('profile')" data-tab="profile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Profile
+    </button>
+  </nav>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = window.location.origin;
+let currentUser = null;
+let imageBase64 = null;
+
+// ── Toast ───────────────────────────────────
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Auth Tabs ───────────────────────────────
+function showAuthTab(tab) {
+  document.querySelectorAll('.auth-tabs button').forEach((b,i) => b.classList.toggle('active', (tab==='login'?0:1)===i));
+  document.getElementById('form-login').classList.toggle('active', tab==='login');
+  document.getElementById('form-register').classList.toggle('active', tab==='register');
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('reg-error').textContent = '';
+}
+
+// ── Login ───────────────────────────────────
+async function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!user || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  document.getElementById('login-btn-text').innerHTML = '<span class="spinner" style="width:16px;height:16px"></span> Signing in...';
+  try {
+    const r = await fetch(API + '/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:user,password:pass}) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Login failed');
+    currentUser = { username: user, id: d.user_id };
+    enterApp();
+    toast('Welcome back, ' + user + '!');
+  } catch(e) { errEl.textContent = e.message; }
+  btn.disabled = false;
+  document.getElementById('login-btn-text').textContent = 'Sign In';
+}
+
+// ── Register ────────────────────────────────
+async function doRegister() {
+  const user = document.getElementById('reg-user').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
+  const errEl = document.getElementById('reg-error');
+  errEl.textContent = '';
+  if (!user || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
+  if (pass.length < 4) { errEl.textContent = 'Password must be at least 4 characters'; return; }
+  if (pass !== pass2) { errEl.textContent = 'Passwords do not match'; return; }
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true;
+  document.getElementById('reg-btn-text').innerHTML = '<span class="spinner" style="width:16px;height:16px"></span> Creating...';
+  try {
+    const r = await fetch(API + '/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:user,password:pass}) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Registration failed');
+    currentUser = { username: user, id: d.id };
+    enterApp();
+    toast('Account created! Welcome to Smarfa!');
+  } catch(e) { errEl.textContent = e.message; }
+  btn.disabled = false;
+  document.getElementById('reg-btn-text').textContent = 'Create Account';
+}
+
+// Enter key handlers
+document.getElementById('login-pass').onkeydown = e => { if(e.key==='Enter') doLogin(); };
+document.getElementById('reg-pass2').onkeydown = e => { if(e.key==='Enter') doRegister(); };
+
+// ── Enter App ───────────────────────────────
+function enterApp() {
+  const name = currentUser.username.split('@')[0];
+  document.getElementById('dash-username').textContent = name;
+  document.getElementById('profile-name').textContent = name;
+  document.getElementById('profile-email').textContent = currentUser.username;
+  document.getElementById('profile-avatar').textContent = name[0].toUpperCase();
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').classList.add('visible');
+  loadDashboardData();
+  checkAI();
+}
+
+function logout() {
+  currentUser = null;
+  imageBase64 = null;
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  switchTab('dashboard');
+}
+
+// ── Tab Navigation ──────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.content > .tab').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (tab === 'alerts') loadAlerts();
+  if (tab === 'profile') checkAI();
+  if (tab === 'reports') loadReports();
+  if (tab === 'dashboard') loadDashboardData();
+}
+
+// ── Dashboard Data ──────────────────────────
+async function loadDashboardData() {
+  try {
+    const r = await fetch(API + '/reports/overview');
+    const d = await r.json();
+    const w = d.week_summary;
+
+    // Health score ring
+    const score = d.health_score;
+    const deg = Math.round(score / 100 * 360);
+    const color = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
+    document.getElementById('health-ring').style.background = 'conic-gradient(' + color + ' 0deg, ' + color + ' ' + deg + 'deg, var(--card) ' + deg + 'deg)';
+    document.getElementById('health-score').textContent = score;
+
+    // Stat cards
+    document.getElementById('s-temp').textContent = w.avg_temp ? w.avg_temp + '\u00B0C' : '\u2014';
+    document.getElementById('s-temp-sub').textContent = w.min_temp ? w.min_temp + '\u00B0 \u2013 ' + w.max_temp + '\u00B0' : '';
+    document.getElementById('s-moisture').textContent = w.avg_moisture ? w.avg_moisture + '%' : '\u2014';
+    document.getElementById('s-moisture-sub').textContent = w.min_moisture ? 'Low: ' + w.min_moisture + '%' : '';
+    document.getElementById('s-height').textContent = w.avg_height ? w.avg_height + 'cm' : '\u2014';
+    document.getElementById('s-height-sub').textContent = w.readings_count ? w.readings_count + ' readings' : '';
+    document.getElementById('s-alerts').textContent = w.alerts_count != null ? w.alerts_count : 0;
+    document.getElementById('s-alerts-sub').textContent = (w.alerts_total != null ? w.alerts_total : 0) + ' total';
+
+    // Pump status
+    loadPumpStatus();
+  } catch(e) { console.log('dashboard error', e); }
+}
+
+// ── Water Pump ──────────────────────────────
+async function loadPumpStatus() {
+  try {
+    const r = await fetch(API + '/pump/status/field-1');
+    const d = await r.json();
+    const ind = document.getElementById('pump-indicator');
+    const txt = document.getElementById('pump-status-text');
+    const det = document.getElementById('pump-status-detail');
+
+    if (d.is_running) {
+      ind.className = 'pump-indicator on';
+      txt.textContent = '\uD83D\uDCA7 Pump Running';
+      txt.style.color = 'var(--green)';
+      det.textContent = d.current.reason + ' \u2014 ' + d.current.duration + 's';
+    } else {
+      ind.className = 'pump-indicator off';
+      txt.textContent = 'Pump Idle';
+      txt.style.color = 'var(--muted)';
+      det.textContent = 'No active irrigation';
+    }
+
+    // Recent logs
+    var logEl = document.getElementById('pump-log');
+    if (d.recent_logs.length) {
+      logEl.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">Recent Activity</div>' +
+        d.recent_logs.slice(0, 5).map(function(l) {
+          return '<div class="pump-log-item"><div><span class="pump-tag ' + esc(l.trigger) + '">' + esc(l.trigger) + '</span>' +
+            '<span style="margin-left:6px">' + esc(l.reason.substring(0,40)) + (l.reason.length>40?'...':'') + '</span></div>' +
+            '<span style="color:var(--muted)">' + l.duration + 's</span></div>';
+        }).join('');
+    } else {
+      logEl.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">No pump activity yet</div>';
+    }
+  } catch(e) { console.log('pump error', e); }
+}
+
+async function startPump() {
+  try {
+    const r = await fetch(API + '/pump/start', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ crop_id: 'field-1', duration_seconds: 120 })
+    });
+    const d = await r.json();
+    toast('\uD83D\uDCA7 Water pump started! Duration: ' + d.duration + 's');
+    loadPumpStatus();
+  } catch(e) { toast('Failed to start pump', 'error'); }
+}
+
+async function stopPump() {
+  try {
+    await fetch(API + '/pump/stop', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ crop_id: 'field-1' })
+    });
+    toast('Pump stopped');
+    loadPumpStatus();
+  } catch(e) { toast('Failed to stop pump', 'error'); }
+}
+
+// ── Crop Scan ───────────────────────────────
+var fileInput = document.getElementById('file-input');
+var scanArea = document.getElementById('scan-area');
+
+fileInput.onchange = function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var dataUrl = ev.target.result;
+    imageBase64 = dataUrl.split(',')[1];
+    document.getElementById('scan-preview').src = dataUrl;
+    document.getElementById('scan-preview').style.display = 'block';
+    document.getElementById('scan-placeholder').style.display = 'none';
+    scanArea.classList.add('has-image');
+    document.getElementById('analyze-btn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+};
+
+scanArea.ondragover = function(e) { e.preventDefault(); scanArea.style.borderColor = 'var(--green)'; };
+scanArea.ondragleave = function() { scanArea.style.borderColor = ''; };
+scanArea.ondrop = function(e) {
+  e.preventDefault(); scanArea.style.borderColor = '';
+  var file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) { fileInput.files = e.dataTransfer.files; fileInput.dispatchEvent(new Event('change')); }
+};
+
+function clearScan() {
+  imageBase64 = null; fileInput.value = '';
+  document.getElementById('scan-preview').style.display = 'none';
+  document.getElementById('scan-placeholder').style.display = '';
+  scanArea.classList.remove('has-image');
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('scan-results').style.display = 'none';
+}
+
+async function analyzeCrop() {
+  if (!imageBase64) return;
+  var btn = document.getElementById('analyze-btn');
+  var loading = document.getElementById('scan-loading');
+  var results = document.getElementById('scan-results');
+  btn.disabled = true; loading.style.display = 'flex'; results.style.display = 'none';
+  try {
+    var r = await fetch(API + '/analyze_crop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ image_base64: imageBase64 }) });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Analysis failed');
+    renderResults(d);
+  } catch(e) {
+    results.innerHTML = '<div class="result-card"><h3>Error</h3><p>' + esc(e.message) + '</p></div>';
+    results.style.display = 'block';
+  }
+  loading.style.display = 'none'; btn.disabled = false;
+}
+
+function renderResults(d) {
+  var el = document.getElementById('scan-results');
+  var sev = d.severity || 'warning';
+  var sevLabel = {healthy:'Healthy \u2705', warning:'Warning \u26A0\uFE0F', critical:'Critical \uD83D\uDEA8'}[sev] || sev;
+  var confColor = (d.ai_confidence||0) >= 60 ? 'var(--green)' : (d.ai_confidence||0) >= 30 ? 'var(--yellow)' : 'var(--red)';
+
+  var issuesHtml = '';
+  if (d.issues && d.issues.length) {
+    issuesHtml = d.issues.map(function(i) { return '<div class="issue-item"><h4>\u26A0\uFE0F ' + esc(i.name) + '</h4><p>' + esc(i.description) + '</p></div>'; }).join('');
+  }
+
+  var recsHtml = '';
+  if (d.recommendations && d.recommendations.length) {
+    recsHtml = '<div class="result-card"><h3>\uD83D\uDCA1 Recommendations</h3><ul class="rec-list">' +
+      d.recommendations.map(function(r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul></div>';
+  }
+
+  var colorHtml = '';
+  if (d._color_stats) {
+    colorHtml = '<div class="result-card"><h3>\uD83C\uDFA8 Color Analysis</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
+    for (var k in d._color_stats) {
+      colorHtml += '<div style="background:var(--card);padding:6px 12px;border-radius:8px;font-size:12px"><span style="color:var(--muted)">' + k.replace('_pct','') + '</span> <b>' + d._color_stats[k] + '%</b></div>';
+    }
+    colorHtml += '</div></div>';
+  }
+
+  el.innerHTML =
+    '<div class="result-card">' +
+      '<div class="result-header"><span class="severity-badge ' + sev + '">' + sevLabel + '</span><span class="model-badge">' + esc(d._model || 'ai') + '</span></div>' +
+      '<h3>\uD83C\uDF3F ' + esc(d.crop_detected || 'Crop Analysis') + '</h3>' +
+      '<p>' + esc(d.health_assessment || '') + '</p>' +
+      issuesHtml +
+      '<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>AI Confidence</span><span>' + (d.ai_confidence||0) + '%</span></div>' +
+      '<div class="confidence-bar"><div class="confidence-fill" style="width:' + (d.ai_confidence||0) + '%;background:' + confColor + '"></div></div></div>' +
+    '</div>' +
+    recsHtml +
+    (d.growth_needs ? '<div class="result-card"><h3>\uD83C\uDF31 Growth Needs</h3><p>' + esc(d.growth_needs) + '</p></div>' : '') +
+    colorHtml;
+  el.style.display = 'block';
+}
+
+function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// ── Reports ─────────────────────────────────
+async function loadReports() {
+  var loading = document.getElementById('reports-loading');
+  var content = document.getElementById('reports-content');
+  loading.style.display = 'flex'; content.style.display = 'none';
+  try {
+    var r = await fetch(API + '/reports/overview');
+    var d = await r.json();
+    var w = d.week_summary;
+
+    // Health ring
+    var score = d.health_score;
+    var deg = Math.round(score / 100 * 360);
+    var color = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
+    document.getElementById('report-health-ring').style.background = 'conic-gradient(' + color + ' 0deg, ' + color + ' ' + deg + 'deg, var(--card) ' + deg + 'deg)';
+    document.getElementById('report-health-score').textContent = score;
+
+    document.getElementById('r-crops').textContent = d.total_crops;
+    document.getElementById('r-readings').textContent = w.readings_count;
+    document.getElementById('r-avg-temp').textContent = w.avg_temp + '\u00B0C';
+    document.getElementById('r-min-temp').textContent = w.min_temp + '\u00B0C';
+    document.getElementById('r-max-temp').textContent = w.max_temp + '\u00B0C';
+    document.getElementById('r-avg-moisture').textContent = w.avg_moisture + '%';
+    document.getElementById('r-min-moisture').textContent = w.min_moisture + '%';
+    document.getElementById('r-pump-count').textContent = w.pump_activations;
+    document.getElementById('r-avg-height').textContent = w.avg_height + 'cm';
+    document.getElementById('r-alert-count').textContent = w.alerts_count;
+    document.getElementById('r-alert-total').textContent = w.alerts_total;
+
+    // Trends
+    if (d.daily_trends.length) {
+      renderTrend('trend-temp', 'trend-temp-labels', d.daily_trends, 'avg_temp', 50);
+      renderTrend('trend-moisture', 'trend-moisture-labels', d.daily_trends, 'avg_moisture', 100);
+      renderTrend('trend-height', 'trend-height-labels', d.daily_trends, 'avg_height');
+    }
+
+    // Alert breakdown
+    var typesEl = document.getElementById('r-alert-types');
+    var typeColors = {moisture_warning:'var(--blue)',temp_warning:'var(--red)',growth_drop:'var(--yellow)',growth_slow:'var(--yellow)',intrusion_alarm:'var(--red)',pump_auto_start:'var(--cyan)'};
+    var entries = Object.entries(d.alert_breakdown);
+    typesEl.innerHTML = entries.length ? entries.map(function(e) {
+      return '<div class="alert-type-badge" style="border-color:' + (typeColors[e[0]]||'var(--border)') + ';color:' + (typeColors[e[0]]||'var(--muted)') + '">' + e[0].replace(/_/g,' ') + ': ' + e[1] + '</div>';
+    }).join('') : '<span style="color:var(--muted);font-size:13px">No alerts this week</span>';
+
+    content.style.display = 'block';
+  } catch(e) {
+    content.innerHTML = '<div class="empty-state"><div class="icon">\uD83D\uDCCA</div><p>No report data yet. Send sensor data to see reports.</p></div>';
+    content.style.display = 'block';
+  }
+  loading.style.display = 'none';
+}
+
+function renderTrend(barId, labelId, data, key, max) {
+  var values = data.map(function(d) { return d[key]; });
+  if (!max) max = Math.max.apply(null, values) * 1.2 || 1;
+  document.getElementById(barId).innerHTML = values.map(function(v, i) {
+    return '<div class="trend-col" style="height:' + Math.max(4, v/max*100) + '%"><div class="tip">' + data[i].date.slice(5) + ': ' + v + '</div></div>';
+  }).join('');
+  document.getElementById(labelId).innerHTML = data.map(function(d) { return '<span>' + d.date.slice(5) + '</span>'; }).join('');
+}
+
+// ── Alerts ──────────────────────────────────
+async function loadAlerts() {
+  var el = document.getElementById('alerts-list');
+  try {
+    var r = await fetch(API + '/alerts');
+    var data = await r.json();
+    if (!data.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">\uD83D\uDD14</div><p>No alerts yet \u2014 your farm is looking good!</p></div>';
+      return;
+    }
+    el.innerHTML = data.map(function(a) {
+      var typeClass = a.type || '';
+      var icons = {moisture_warning:'\uD83D\uDCA7',temp_warning:'\uD83C\uDF21\uFE0F',growth_drop:'\uD83D\uDCC9',growth_slow:'\uD83D\uDC0C',intrusion_alarm:'\uD83D\uDEA8',pump_auto_start:'\uD83D\uDCA7'};
+      var icon = icons[a.type] || '\u26A0\uFE0F';
+      return '<div class="alert-item ' + esc(typeClass) + '">' +
+        '<div style="display:flex;align-items:center"><span class="time">' + icon + ' ' + new Date(a.timestamp).toLocaleString() + '</span><span class="type-tag">' + esc(a.type||'alert') + '</span></div>' +
+        '<div class="msg">' + esc(a.message) + '</div></div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">\u26A0\uFE0F</div><p>Could not load alerts</p></div>';
+  }
+}
+
+// ── AI Status ───────────────────────────────
+async function checkAI() {
+  var banner = document.getElementById('ai-banner');
+  var profileAI = document.getElementById('profile-ai');
+  try {
+    var r = await fetch(API + '/ai_status');
+    var d = await r.json();
+    if (d.ollama) {
+      banner.style.display = 'none';
+      var models = d.models.map(function(m) { return m.split(':')[0]; }).join(', ');
+      profileAI.innerHTML = '<span style="color:var(--green)">Ollama (' + models + ') \u2705</span>';
+    } else {
+      banner.style.display = 'block';
+      banner.innerHTML = '\uD83D\uDCA1 Install <a href="https://ollama.com" target="_blank">Ollama</a> for AI crop analysis. Without it, color analysis is used.';
+      profileAI.textContent = 'Local (PIL analysis)';
+    }
+  } catch(e) { profileAI.textContent = 'Local (PIL)'; }
+}
+
+// Auto-refresh pump status every 30s
+setInterval(function() { if (currentUser) loadPumpStatus(); }, 30000);
+</script>
+</body>
+</html>

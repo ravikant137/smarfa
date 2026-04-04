@@ -32,3 +32,14 @@ class User(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
+
+class WaterPumpLog(Base):
+    __tablename__ = "water_pump_log"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    crop_id = Column(String, nullable=False)
+    timestamp = Column(DateTime, nullable=False)
+    trigger = Column(String, nullable=False)       # "auto" | "manual"
+    reason = Column(String, nullable=False)
+    moisture_before = Column(Float, nullable=True)
+    duration_seconds = Column(Integer, nullable=False)
+    status = Column(String, nullable=False)         # "running" | "completed" | "stopped"

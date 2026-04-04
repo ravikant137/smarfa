@@ -31,7 +31,7 @@ export default function RegisterScreen({ navigation }) {
       });
 
       if (response.data?.status === 'user registered') {
-        navigation.navigate('Home');
+        navigation.navigate('Home', { username: email.trim().toLowerCase(), userId: response.data.id });
       } else {
         setError(response.data?.detail || 'Registration failed. Please try again.');
       }
