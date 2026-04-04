@@ -28,9 +28,12 @@ def notify_farmers(message: str):
             logger.warning("Failed mobile push to %s: %s", dev["farmer_id"], ex)
 
 
-def track_alert(crop_id: str, alert_type: str, message: str, session):
-    from app.models import Alert
-    alert = Alert(crop_id=crop_id, type=alert_type, message=message, timestamp=datetime.utcnow())
-    session.add(alert)
-    session.commit()
+def track_alert(crop_id: str, alert_type: str, message: str, db):
+    from datetime import datetime as _dt
+    now = _dt.utcnow().isoformat()
+    db.execute(
+        "INSERT INTO alerts (crop_id, type, message, timestamp) VALUES (?,?,?,?)",
+        (crop_id, alert_type, message, now)
+    )
+    db.commit()
     notify_farmers(f"[{alert_type.upper()}] {crop_id}: {message}")

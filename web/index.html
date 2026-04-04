@@ -413,6 +413,29 @@ button{font-family:inherit}
       </div>
     </div>
 
+    <!-- ── Tab: Crop Lifecycle ────── -->
+    <div class="tab" id="tab-lifecycle">
+      <div class="section-title">🌱 Crop Lifecycle Guide</div>
+      <div style="margin-bottom:14px">
+        <select id="lifecycle-crop-select" onchange="loadLifecycle()" style="width:100%;background:#1E293B;color:#E2E8F0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px 12px;font-size:13px;outline:none;">
+          <option value="">— Select a crop —</option>
+          <option value="Tomato">🍅 Tomato</option>
+          <option value="Apple">🍎 Apple</option>
+          <option value="Corn">🌽 Corn</option>
+          <option value="Rice">🌾 Rice</option>
+          <option value="Wheat">🌾 Wheat</option>
+          <option value="Grape">🍇 Grape</option>
+          <option value="Potato">🥔 Potato</option>
+          <option value="Mango">🥭 Mango</option>
+          <option value="Citrus">🍊 Citrus</option>
+          <option value="Sunflower">🌻 Sunflower</option>
+          <option value="Pepper">🌶️ Pepper</option>
+          <option value="Banana">🍌 Banana</option>
+        </select>
+      </div>
+      <div id="lifecycle-content"></div>
+    </div>
+
     <!-- ── Tab: Profile ────────────── -->
     <div class="tab" id="tab-profile">
       <div class="profile-header">
@@ -447,6 +470,10 @@ button{font-family:inherit}
     <button onclick="switchTab('alerts')" data-tab="alerts">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
       Alerts
+    </button>
+    <button onclick="switchTab('lifecycle')" data-tab="lifecycle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 12v-6m-6-4h6m6 0h-6"/><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 0110 10 10 10 0 01-10 10A10 10 0 012 12 10 10 0 0112 2z"/></svg>
+      Lifecycle
     </button>
     <button onclick="switchTab('profile')" data-tab="profile">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -716,28 +743,77 @@ function renderResults(d) {
   var sev = d.severity || 'warning';
   var sevLabel = {healthy:'Healthy \u2705', warning:'Warning \u26A0\uFE0F', critical:'Critical \uD83D\uDEA8'}[sev] || sev;
   var confColor = (d.ai_confidence||0) >= 60 ? 'var(--green)' : (d.ai_confidence||0) >= 30 ? 'var(--yellow)' : 'var(--red)';
+  var s = d.structured || {};
+
+  // ── Top-3 Crop Identification ──
+  var top3Html = '';
+  if (s.crop_identification && s.crop_identification.length) {
+    top3Html = '<div class="result-card"><h3>🎯 Crop Identification (Top 3)</h3>';
+    if (s.uncertain) top3Html += '<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:var(--yellow)">⚠️ Confidence below 80% — provide additional close-up images for more accurate identification</div>';
+    s.crop_identification.forEach(function(c, i) {
+      var barW = parseInt(c.confidence) || 0;
+      var barColor = i === 0 ? 'var(--green)' : i === 1 ? 'var(--blue)' : 'var(--purple)';
+      top3Html += '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>' + (i===0?'🥇':i===1?'🥈':'🥉') + ' ' + esc(c.name) + '</span><span style="color:' + barColor + ';font-weight:700">' + esc(c.confidence) + '</span></div>' +
+        '<div class="confidence-bar"><div class="confidence-fill" style="width:' + barW + '%;background:' + barColor + '"></div></div></div>';
+    });
+    top3Html += '<div style="font-size:14px;font-weight:700;margin-top:10px;color:var(--green)">Final: ' + esc(s.final_crop || d.crop_detected || '—') + '</div></div>';
+  }
+
+  // ── Disease Detection ──
+  var diseaseHtml = '';
+  if (s.disease && s.disease.name && s.disease.name !== 'No disease detected') {
+    var sevCol = {Low:'var(--green)',Medium:'var(--yellow)',High:'var(--red)',None:'var(--green)'};
+    diseaseHtml = '<div class="result-card"><h3>🦠 Disease Detection</h3>' +
+      '<div class="report-metric"><span class="label">Disease</span><span class="val" style="color:var(--red)">' + esc(s.disease.name) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Confidence</span><span class="val">' + esc(s.disease.confidence) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Cause</span><span class="val">' + esc(s.disease.cause) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Severity</span><span class="val" style="color:' + (sevCol[s.disease.severity]||'var(--muted)') + '">' + esc(s.disease.severity) + '</span></div>' +
+      '</div>';
+  } else if (sev === 'healthy') {
+    diseaseHtml = '<div class="result-card" style="border-left:3px solid var(--green)"><h3>✅ No Disease Detected</h3><p>Your plant appears healthy. Continue regular care practices.</p></div>';
+  }
+
+  // ── Treatment ──
+  var treatHtml = '';
+  if (s.treatment && sev !== 'healthy') {
+    treatHtml = '<div class="result-card"><h3>💊 Treatment Recommendations</h3>' +
+      '<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px">🌿 Organic Solution</div><p style="font-size:12px;line-height:1.6">' + esc(s.treatment.organic) + '</p></div>' +
+      '<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--blue);font-weight:600;margin-bottom:4px">🧪 Chemical Solution</div><p style="font-size:12px;line-height:1.6">' + esc(s.treatment.chemical) + '</p></div>' +
+      '<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--cyan);font-weight:600;margin-bottom:4px">💉 Dosage</div><p style="font-size:12px;line-height:1.6">' + esc(s.treatment.dosage) + '</p></div>' +
+      '<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">🛡️ Prevention</div><p style="font-size:12px;line-height:1.6">' + esc(s.treatment.prevention) + '</p></div>' +
+      '<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--blue);font-weight:600;margin-bottom:4px">💧 Irrigation Adjustment</div><p style="font-size:12px;line-height:1.6">' + esc(s.treatment.irrigation_adjustment || '') + '</p></div>' +
+      '<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:4px">🧪 Soil Correction</div><p style="font-size:12px;line-height:1.6">' + esc(s.treatment.soil_correction || '') + '</p></div>' +
+      '</div>';
+  } else if (s.treatment && sev === 'healthy') {
+    treatHtml = '<div class="result-card"><h3>🌿 Maintenance Tips</h3>' +
+      '<p style="font-size:12px;line-height:1.6">' + esc(s.treatment.organic || 'Continue regular organic care.') + '</p>' +
+      '<p style="font-size:12px;line-height:1.6;margin-top:6px">' + esc(s.treatment.prevention || '') + '</p></div>';
+  }
+
+  // ── Quick Lifecycle Summary ──
+  var lcHtml = '';
+  if (s.crop_lifecycle && s.crop_lifecycle.crop_name) {
+    var lc = s.crop_lifecycle;
+    lcHtml = '<div class="result-card"><h3>📅 Crop Lifecycle (' + esc(lc.crop_name) + ')</h3>' +
+      '<div class="report-metric"><span class="label">Total Growth</span><span class="val">' + esc(lc.total_days) + ' days</span></div>' +
+      '<div class="report-metric"><span class="label">Germination</span><span class="val">' + esc(lc.germination) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Vegetative</span><span class="val">' + esc(lc.vegetative) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Flowering</span><span class="val">' + esc(lc.flowering) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Fruiting</span><span class="val">' + esc(lc.fruiting) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Harvest</span><span class="val">' + esc(lc.harvest) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Soil Type</span><span class="val">' + esc(lc.soil_type) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Sunlight</span><span class="val">' + esc(lc.sunlight) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Yield/Acre</span><span class="val">' + esc(lc.yield_per_acre) + '</span></div>' +
+      '<div style="margin-top:8px;text-align:center"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'lifecycle-crop-select\').value=\'' + esc(lc.crop_name) + '\';switchTab(\'lifecycle\');loadLifecycle()">📖 Full Lifecycle Details</button></div>' +
+      '</div>';
+  }
 
   var issuesHtml = '';
   if (d.issues && d.issues.length) {
     issuesHtml = d.issues.map(function(i) { return '<div class="issue-item"><h4>\u26A0\uFE0F ' + esc(i.name) + '</h4><p>' + esc(i.description) + '</p></div>'; }).join('');
   }
 
-  var recsHtml = '';
-  if (d.recommendations && d.recommendations.length) {
-    recsHtml = '<div class="result-card"><h3>\uD83D\uDCA1 Recommendations</h3><ul class="rec-list">' +
-      d.recommendations.map(function(r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul></div>';
-  }
-
-  var colorHtml = '';
-  if (d._color_stats) {
-    colorHtml = '<div class="result-card"><h3>\uD83C\uDFA8 Color Analysis</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
-    for (var k in d._color_stats) {
-      colorHtml += '<div style="background:var(--card);padding:6px 12px;border-radius:8px;font-size:12px"><span style="color:var(--muted)">' + k.replace('_pct','') + '</span> <b>' + d._color_stats[k] + '%</b></div>';
-    }
-    colorHtml += '</div></div>';
-  }
-
-  el.innerHTML =
+  el.innerHTML = top3Html + diseaseHtml + treatHtml +
     '<div class="result-card">' +
       '<div class="result-header"><span class="severity-badge ' + sev + '">' + sevLabel + '</span><span class="model-badge">' + esc(d._model || 'ai') + '</span></div>' +
       '<h3>\uD83C\uDF3F ' + esc(d.crop_detected || 'Crop Analysis') + '</h3>' +
@@ -746,9 +822,8 @@ function renderResults(d) {
       '<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>AI Confidence</span><span>' + (d.ai_confidence||0) + '%</span></div>' +
       '<div class="confidence-bar"><div class="confidence-fill" style="width:' + (d.ai_confidence||0) + '%;background:' + confColor + '"></div></div></div>' +
     '</div>' +
-    recsHtml +
-    (d.growth_needs ? '<div class="result-card"><h3>\uD83C\uDF31 Growth Needs</h3><p>' + esc(d.growth_needs) + '</p></div>' : '') +
-    colorHtml;
+    lcHtml +
+    (d.growth_needs ? '<div class="result-card"><h3>\uD83C\uDF31 Growth Needs</h3><p>' + esc(d.growth_needs) + '</p></div>' : '');
   el.style.display = 'block';
 }
 
@@ -895,6 +970,60 @@ async function checkAI() {
       profileAI.textContent = 'Local (PIL analysis)';
     }
   } catch(e) { profileAI.textContent = 'Local (PIL)'; }
+}
+
+// ── Crop Lifecycle ───────────────────────────
+async function loadLifecycle() {
+  var crop = document.getElementById('lifecycle-crop-select').value;
+  var el = document.getElementById('lifecycle-content');
+  if (!crop) { el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:48px;margin-bottom:12px">🌱</div><p>Select a crop above to view its complete lifecycle</p></div>'; return; }
+  el.innerHTML = '<div class="loading-overlay" style="position:relative;display:flex"><div class="spinner"></div><p>Loading lifecycle data...</p></div>';
+  try {
+    var r = await fetch(API + '/crop_lifecycle/' + encodeURIComponent(crop));
+    if (!r.ok) throw new Error('Not found');
+    var d = await r.json();
+    var stages = d.stages || {};
+    var stageOrder = ['germination','vegetative','flowering','fruiting','harvest'];
+    var stageIcons = {germination:'🌱',vegetative:'🌿',flowering:'🌸',fruiting:'🍎',harvest:'🌾'};
+
+    var html = '<div class="result-card" style="border-left:3px solid var(--green)"><h3>🌱 ' + esc(d.crop_name) + '</h3>' +
+      '<div class="report-metric"><span class="label">Varieties</span><span class="val" style="font-size:12px">' + (d.variety_types||[]).join(', ') + '</span></div>' +
+      '<div class="report-metric"><span class="label">Total Growth Duration</span><span class="val">' + esc(d.total_growth_days) + ' days</span></div>' +
+      '<div class="report-metric"><span class="label">Sunlight</span><span class="val">' + esc(d.sunlight) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Soil Preference</span><span class="val" style="font-size:12px">' + esc(d.soil_type) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Yield per Acre</span><span class="val" style="font-size:12px">' + esc(d.yield_per_acre) + '</span></div></div>';
+
+    // Growth stages
+    stageOrder.forEach(function(sKey) {
+      var st = stages[sKey];
+      if (!st) return;
+      var icon = stageIcons[sKey] || '🌿';
+      html += '<div class="result-card">' +
+        '<h3>' + icon + ' ' + sKey.charAt(0).toUpperCase() + sKey.slice(1) + ' Stage</h3>' +
+        '<div class="report-metric"><span class="label">Duration</span><span class="val">' + esc(st.duration_days) + '</span></div>' +
+        '<div class="report-metric"><span class="label">💧 Water</span><span class="val" style="font-size:12px">' + esc(st.water) + '</span></div>' +
+        '<div class="report-metric"><span class="label">🧪 Fertilizer</span><span class="val" style="font-size:12px">' + esc(st.fertilizer) + '</span></div>';
+      // Pest risks for this stage
+      if (d.pest_risks && d.pest_risks[sKey]) {
+        html += '<div class="report-metric"><span class="label">🐛 Pest Risks</span><span class="val" style="font-size:12px;color:var(--yellow)">' + d.pest_risks[sKey].join(', ') + '</span></div>';
+      }
+      // Disease risks for this stage
+      if (d.disease_risks && d.disease_risks[sKey]) {
+        html += '<div class="report-metric"><span class="label">🦠 Disease Risks</span><span class="val" style="font-size:12px;color:var(--red)">' + d.disease_risks[sKey].join(', ') + '</span></div>';
+      }
+      html += '</div>';
+    });
+
+    // Harvest indicators
+    if (d.harvest_indicators && d.harvest_indicators.length) {
+      html += '<div class="result-card" style="border-left:3px solid var(--yellow)"><h3>✅ Harvest Indicators</h3><ul class="rec-list">' +
+        d.harvest_indicators.map(function(h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ul></div>';
+    }
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<div class="result-card"><h3>Error</h3><p>Could not load lifecycle for ' + esc(crop) + '</p></div>';
+  }
 }
 
 // Auto-refresh pump status every 30s
