@@ -1,0 +1,17 @@
+# SmartFarm AI - Requirements
+# All open-source, no paid APIs
+
+# Core ML
+tensorflow>=2.13.0,<2.18.0
+numpy>=1.24.0
+Pillow>=10.0.0
+scikit-learn>=1.3.0
+
+# API
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+python-multipart>=0.0.6
+
+# Optional: lightweight TFLite runtime for mobile/edge deployment
+# Install separately on target device:
+# pip install tflite-runtime

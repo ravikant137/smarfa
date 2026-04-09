@@ -8,3 +8,8 @@ __pycache__/
 .expo/
 node_modules/
 mobile-app/node_modules/
+
+# Large ML files — download/train locally
+smartfarm-ai/dataset/
+smartfarm-ai/model/*.h5
+smartfarm-ai/model/*.tflite

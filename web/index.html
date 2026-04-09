@@ -319,26 +319,7 @@ button{font-family:inherit}
         <button class="btn btn-outline" onclick="clearScan()">Clear</button>
       </div>
 
-      <div style="margin-top:10px;">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">🌿 Which crop are you scanning? <span style="opacity:.6">(optional — improves accuracy)</span></label>
-        <select id="crop-hint-select" style="width:100%;background:#1E293B;color:#E2E8F0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px 12px;font-size:13px;outline:none;">
-          <option value="">— Let AI decide —</option>
-          <option value="Apple">🍎 Apple</option>
-          <option value="Tomato">🍅 Tomato</option>
-          <option value="Potato">🥔 Potato</option>
-          <option value="Corn">🌽 Corn / Maize</option>
-          <option value="Rice">🌾 Rice</option>
-          <option value="Wheat">🌾 Wheat</option>
-          <option value="Grape">🍇 Grape</option>
-          <option value="Sunflower">🌻 Sunflower</option>
-          <option value="Citrus">🍊 Citrus / Orange</option>
-          <option value="Mango">🥭 Mango</option>
-          <option value="Pepper">🌶️ Pepper / Chili</option>
-          <option value="Bean">🫘 Bean / Soybean</option>
-          <option value="Banana">🍌 Banana</option>
-          <option value="Sugarcane">🎋 Sugarcane</option>
-        </select>
-      </div>
+
 
       <div id="scan-loading" class="loading-overlay" style="display:none">
         <div class="spinner"></div>
@@ -724,9 +705,7 @@ async function analyzeCrop() {
   var results = document.getElementById('scan-results');
   btn.disabled = true; loading.style.display = 'flex'; results.style.display = 'none';
   try {
-    var cropHint = (document.getElementById('crop-hint-select') || {}).value || '';
     var payload = { image_base64: imageBase64 };
-    if (cropHint) payload.crop_hint = cropHint;
     var r = await fetch(API + '/analyze_crop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     var d = await r.json();
     if (!r.ok) throw new Error(d.detail || 'Analysis failed');
@@ -745,19 +724,17 @@ function renderResults(d) {
   var confColor = (d.ai_confidence||0) >= 60 ? 'var(--green)' : (d.ai_confidence||0) >= 30 ? 'var(--yellow)' : 'var(--red)';
   var s = d.structured || {};
 
-  // ── Top-3 Crop Identification ──
-  var top3Html = '';
-  if (s.crop_identification && s.crop_identification.length) {
-    top3Html = '<div class="result-card"><h3>🎯 Crop Identification (Top 3)</h3>';
-    if (s.uncertain) top3Html += '<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:var(--yellow)">⚠️ Confidence below 80% — provide additional close-up images for more accurate identification</div>';
-    s.crop_identification.forEach(function(c, i) {
-      var barW = parseInt(c.confidence) || 0;
-      var barColor = i === 0 ? 'var(--green)' : i === 1 ? 'var(--blue)' : 'var(--purple)';
-      top3Html += '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>' + (i===0?'🥇':i===1?'🥈':'🥉') + ' ' + esc(c.name) + '</span><span style="color:' + barColor + ';font-weight:700">' + esc(c.confidence) + '</span></div>' +
-        '<div class="confidence-bar"><div class="confidence-fill" style="width:' + barW + '%;background:' + barColor + '"></div></div></div>';
-    });
-    top3Html += '<div style="font-size:14px;font-weight:700;margin-top:10px;color:var(--green)">Final: ' + esc(s.final_crop || d.crop_detected || '—') + '</div></div>';
-  }
+  // ── Crop Identification (single result) ──
+  var cropIdHtml = '';
+  var detectedCrop = s.final_crop || d.crop_detected || '—';
+  var cropConf = (d.ai_confidence || 0);
+  var cropConfColor = cropConf >= 60 ? 'var(--green)' : cropConf >= 30 ? 'var(--yellow)' : 'var(--red)';
+  cropIdHtml = '<div class="result-card"><h3>🎯 Crop Identified</h3>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">' +
+    '<span style="font-size:18px;font-weight:700;color:var(--green)">' + esc(detectedCrop) + '</span>' +
+    '<span style="font-size:16px;font-weight:700;color:' + cropConfColor + '">' + cropConf + '%</span></div>' +
+    '<div class="confidence-bar" style="margin-top:10px"><div class="confidence-fill" style="width:' + cropConf + '%;background:' + cropConfColor + '"></div></div>' +
+    '</div>';
 
   // ── Disease Detection ──
   var diseaseHtml = '';
@@ -813,14 +790,12 @@ function renderResults(d) {
     issuesHtml = d.issues.map(function(i) { return '<div class="issue-item"><h4>\u26A0\uFE0F ' + esc(i.name) + '</h4><p>' + esc(i.description) + '</p></div>'; }).join('');
   }
 
-  el.innerHTML = top3Html + diseaseHtml + treatHtml +
+  el.innerHTML = cropIdHtml + diseaseHtml + treatHtml +
     '<div class="result-card">' +
       '<div class="result-header"><span class="severity-badge ' + sev + '">' + sevLabel + '</span><span class="model-badge">' + esc(d._model || 'ai') + '</span></div>' +
       '<h3>\uD83C\uDF3F ' + esc(d.crop_detected || 'Crop Analysis') + '</h3>' +
       '<p>' + esc(d.health_assessment || '') + '</p>' +
       issuesHtml +
-      '<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>AI Confidence</span><span>' + (d.ai_confidence||0) + '%</span></div>' +
-      '<div class="confidence-bar"><div class="confidence-fill" style="width:' + (d.ai_confidence||0) + '%;background:' + confColor + '"></div></div></div>' +
     '</div>' +
     lcHtml +
     (d.growth_needs ? '<div class="result-card"><h3>\uD83C\uDF31 Growth Needs</h3><p>' + esc(d.growth_needs) + '</p></div>' : '');

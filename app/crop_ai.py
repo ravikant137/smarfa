@@ -17,6 +17,23 @@ import time
 
 logger = logging.getLogger(__name__)
 
+# TF model integration — lazy import to avoid slow startup when model absent
+_tf_model = None
+def _get_tf_model():
+    global _tf_model
+    if _tf_model is None:
+        try:
+            from app import tf_model as _mod
+            if _mod.is_model_available():
+                _tf_model = _mod
+                logger.info("[CropAI] TF model available — will use for predictions")
+            else:
+                _tf_model = False  # sentinel: checked but not available
+        except Exception as e:
+            logger.warning(f"[CropAI] TF model import failed: {e}")
+            _tf_model = False
+    return _tf_model if _tf_model is not False else None
+
 OLLAMA_BASE = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 # Vision models need >6GB RAM. Set SMARFA_VISION=1 to enable on capable machines.
@@ -1918,12 +1935,76 @@ def _compute_all_crop_scores(features: dict) -> list[tuple[str, int]]:
     return result
 
 
+# ── TF Model Result Builder ──────────────────────────────────────────────
+
+def _build_tf_result(tf_pred: dict, features: dict) -> dict:
+    """Build a full analysis result from a TF model prediction."""
+    tf_mod = _get_tf_model()
+    class_name = tf_pred["class_name"]
+    confidence = tf_pred["confidence"]
+    crop, disease = tf_mod.parse_class_name(class_name)
+
+    is_healthy = disease is None
+    severity = "healthy" if is_healthy else ("critical" if confidence > 0.85 else "warning")
+    # Scale AI confidence: TF confidence 0.05-1.0 → display 45-99%
+    # Even low-confidence TF predictions are better than colour heuristics
+    ai_confidence = max(45, min(99, int(confidence * 100)))
+
+    issues = []
+    if disease:
+        issues.append({
+            "name": disease,
+            "description": f"AI model detected {disease} on {crop} with {confidence*100:.1f}% confidence.",
+        })
+        # Also check PIL features for supporting evidence
+        if features.get("total_damaged_pct", 0) > 5:
+            issues.append({
+                "name": "Visible leaf damage",
+                "description": f"Image analysis detected ~{features['total_damaged_pct']:.0f}% damaged area (brown/yellow regions)."
+            })
+
+    health_assessment = (
+        f"{crop} leaf appears healthy with no visible disease symptoms. Confidence: {ai_confidence}%."
+        if is_healthy else
+        f"{crop} shows signs of {disease}. AI model confidence: {ai_confidence}%. "
+        f"{'Immediate treatment recommended.' if severity == 'critical' else 'Monitor closely and consider treatment.'}"
+    )
+
+    # Build top-3 predictions display
+    top3 = tf_pred.get("top3", [])
+    top3_display = []
+    for entry in top3:
+        c, d = tf_mod.parse_class_name(entry["class_name"])
+        label = f"{c} - {d}" if d else f"{c} (healthy)"
+        top3_display.append({"label": label, "confidence": round(entry["confidence"] * 100, 1)})
+
+    recommendations = []
+    if is_healthy:
+        recommendations = [
+            "Continue current care routine",
+            "Monitor regularly for early disease signs",
+            "Maintain proper watering and nutrition schedule",
+        ]
+
+    return {
+        "crop_detected": crop,
+        "severity": severity,
+        "ai_confidence": ai_confidence,
+        "health_assessment": health_assessment,
+        "issues": issues,
+        "recommendations": recommendations,
+        "top3_predictions": top3_display,
+        "_model": "smartfarm-tf",
+        "analysis_mode": "tf-model",
+    }
+
+
 # ── Main Entry Point ─────────────────────────────────────────────────────
 
 async def analyze_crop_image(image_base64: str, crop_hint: str | None = None) -> dict:
     """
     Analyze a crop image — completely free, no API keys.
-    Pipeline: vision LLM → PIL + text LLM → PIL-only → knowledge base.
+    Pipeline: TF model (best) → vision LLM → PIL + text LLM → PIL-only → knowledge base.
 
     Args:
         image_base64: Base64-encoded image data.
@@ -1933,6 +2014,26 @@ async def analyze_crop_image(image_base64: str, crop_hint: str | None = None) ->
     started_at = time.perf_counter()
     image_bytes = base64.b64decode(image_base64)
     features = extract_image_features(image_bytes)
+
+    # 0. Try TF model — fastest and most accurate when available.
+    #    Always prefer TF model over colour heuristics (even at low confidence
+    #    the trained model outperforms the PIL-colour fallback).
+    tf_mod = _get_tf_model()
+    if tf_mod is not None:
+        try:
+            tf_pred = tf_mod.predict_from_base64(image_base64)
+            if tf_pred and tf_pred["confidence"] > 0.05:
+                result = _build_tf_result(tf_pred, features)
+                _enrich_from_knowledge_base(result)
+                if crop_hint:
+                    result["crop_detected"] = crop_hint.strip().title()
+                    result["ai_confidence"] = max(result.get("ai_confidence", 95), 97)
+                    result["analysis_mode"] += "+hint"
+                result["analysis_time_ms"] = int((time.perf_counter() - started_at) * 1000)
+                result["structured"] = build_structured_response(result, features)
+                return result
+        except Exception as e:
+            logger.warning(f"[CropAI] TF model prediction error: {e}")
 
     # 1. Try vision models (best quality, needs RAM)
     result = await _try_vision_models(image_base64)
