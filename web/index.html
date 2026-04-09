@@ -724,12 +724,20 @@ function renderResults(d) {
   var confColor = (d.ai_confidence||0) >= 60 ? 'var(--green)' : (d.ai_confidence||0) >= 30 ? 'var(--yellow)' : 'var(--red)';
   var s = d.structured || {};
 
+  // ── Confidence Warning Banner (if low/moderate confidence) ──
+  var warningHtml = '';
+  if (s.confidence_warning) {
+    warningHtml = '<div class="result-card" style="border-left:3px solid var(--yellow);background:rgba(255,193,7,0.08)">' +
+      '<h3>\u26A0\uFE0F Image Quality Notice</h3>' +
+      '<p style="font-size:13px;line-height:1.6">' + esc(s.confidence_warning) + '</p></div>';
+  }
+
   // ── Crop Identification (single result) ──
   var cropIdHtml = '';
   var detectedCrop = s.final_crop || d.crop_detected || '—';
   var cropConf = (d.ai_confidence || 0);
   var cropConfColor = cropConf >= 60 ? 'var(--green)' : cropConf >= 30 ? 'var(--yellow)' : 'var(--red)';
-  cropIdHtml = '<div class="result-card"><h3>🎯 Crop Identified</h3>' +
+  cropIdHtml = '<div class="result-card"><h3>\uD83C\uDFAF Crop Identified</h3>' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">' +
     '<span style="font-size:18px;font-weight:700;color:var(--green)">' + esc(detectedCrop) + '</span>' +
     '<span style="font-size:16px;font-weight:700;color:' + cropConfColor + '">' + cropConf + '%</span></div>' +
@@ -739,15 +747,15 @@ function renderResults(d) {
   // ── Disease Detection ──
   var diseaseHtml = '';
   if (s.disease && s.disease.name && s.disease.name !== 'No disease detected') {
-    var sevCol = {Low:'var(--green)',Medium:'var(--yellow)',High:'var(--red)',None:'var(--green)'};
-    diseaseHtml = '<div class="result-card"><h3>🦠 Disease Detection</h3>' +
+    var sevCol = {Low:'var(--green)',Medium:'var(--yellow)',High:'var(--red)',Critical:'var(--red)',None:'var(--green)'};
+    diseaseHtml = '<div class="result-card"><h3>\uD83E\uDDA0 Disease Detection</h3>' +
       '<div class="report-metric"><span class="label">Disease</span><span class="val" style="color:var(--red)">' + esc(s.disease.name) + '</span></div>' +
       '<div class="report-metric"><span class="label">Confidence</span><span class="val">' + esc(s.disease.confidence) + '</span></div>' +
-      '<div class="report-metric"><span class="label">Cause</span><span class="val">' + esc(s.disease.cause) + '</span></div>' +
+      '<div class="report-metric"><span class="label">Cause</span><span class="val" style="font-size:11px;line-height:1.5">' + esc(s.disease.cause) + '</span></div>' +
       '<div class="report-metric"><span class="label">Severity</span><span class="val" style="color:' + (sevCol[s.disease.severity]||'var(--muted)') + '">' + esc(s.disease.severity) + '</span></div>' +
       '</div>';
   } else if (sev === 'healthy') {
-    diseaseHtml = '<div class="result-card" style="border-left:3px solid var(--green)"><h3>✅ No Disease Detected</h3><p>Your plant appears healthy. Continue regular care practices.</p></div>';
+    diseaseHtml = '<div class="result-card" style="border-left:3px solid var(--green)"><h3>\u2705 No Disease Detected</h3><p>Your plant appears healthy. Continue regular care practices.</p></div>';
   }
 
   // ── Treatment ──
@@ -790,7 +798,7 @@ function renderResults(d) {
     issuesHtml = d.issues.map(function(i) { return '<div class="issue-item"><h4>\u26A0\uFE0F ' + esc(i.name) + '</h4><p>' + esc(i.description) + '</p></div>'; }).join('');
   }
 
-  el.innerHTML = cropIdHtml + diseaseHtml + treatHtml +
+  el.innerHTML = warningHtml + cropIdHtml + diseaseHtml + treatHtml +
     '<div class="result-card">' +
       '<div class="result-header"><span class="severity-badge ' + sev + '">' + sevLabel + '</span><span class="model-badge">' + esc(d._model || 'ai') + '</span></div>' +
       '<h3>\uD83C\uDF3F ' + esc(d.crop_detected || 'Crop Analysis') + '</h3>' +

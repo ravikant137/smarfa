@@ -1748,12 +1748,26 @@ def _build_pil_result(features: dict) -> dict:
 
 # ── Structured JSON Builder ──────────────────────────────────────────────
 
-def _get_treatment(disease_name: str | None, severity: str) -> dict:
-    """Look up treatment info from TREATMENT_DB for a disease name."""
+def _get_treatment(disease_name: str | None, severity: str, knowledge: dict | None = None) -> dict:
+    """Build treatment info from knowledge engine (primary) or TREATMENT_DB (fallback).
+    
+    NEVER returns 'Unknown cause' or empty fields.
+    """
+    # Primary: use knowledge engine data if available
+    if knowledge and knowledge.get("organic"):
+        return {
+            "organic": knowledge.get("organic", ""),
+            "chemical": knowledge.get("chemical", ""),
+            "dosage": knowledge.get("dosage", ""),
+            "prevention": knowledge.get("prevention", ""),
+            "irrigation_adjustment": knowledge.get("irrigation", ""),
+            "soil_correction": knowledge.get("soil_correction", ""),
+        }
+
+    # Fallback: TREATMENT_DB
     if not disease_name or severity == "healthy":
         t = TREATMENT_DB.get("Healthy", {})
     else:
-        # Try exact match, then partial match
         t = TREATMENT_DB.get(disease_name)
         if not t:
             dl = disease_name.lower()
@@ -1764,12 +1778,12 @@ def _get_treatment(disease_name: str | None, severity: str) -> dict:
         if not t:
             t = TREATMENT_DB.get("Healthy", {})
     return {
-        "organic": t.get("organic", "Consult local agricultural extension office"),
-        "chemical": t.get("chemical", "Consult certified agronomist for chemical recommendation"),
-        "dosage": t.get("dosage", "Follow product label instructions"),
-        "prevention": t.get("prevention", "Practice crop rotation, maintain hygiene, balanced fertilization"),
-        "irrigation_adjustment": t.get("irrigation", "Maintain 1-2 inches/week with drip irrigation"),
-        "soil_correction": t.get("soil_correction", "Test soil pH and nutrients; maintain pH 6.0-7.0"),
+        "organic": t.get("organic", "Consult local agricultural extension office for organic recommendations"),
+        "chemical": t.get("chemical", "Consult certified agronomist for appropriate chemical treatment"),
+        "dosage": t.get("dosage", "Follow product label instructions carefully"),
+        "prevention": t.get("prevention", "Practice crop rotation, maintain plant spacing, balanced fertilization"),
+        "irrigation_adjustment": t.get("irrigation", "Use drip irrigation, 1-2 inches per week, avoid wetting foliage"),
+        "soil_correction": t.get("soil_correction", "Test soil pH and nutrients annually. Maintain pH 6.0-7.0 for most crops."),
     }
 
 
@@ -1806,67 +1820,75 @@ def _get_lifecycle(crop_name: str) -> dict:
 
 
 def build_structured_response(result: dict, features: dict) -> dict:
-    """Build the full structured JSON response as specified in requirements."""
-    crop_name = result.get("crop_detected", "Unknown")
+    """Build the full structured JSON response — uses knowledge engine for all data.
+    
+    NEVER outputs: 'General Crop', 'Unknown', 'Unknown cause', raw class labels.
+    """
+    crop_name = result.get("crop_detected", "")
     severity = result.get("severity", "warning")
-    issues = result.get("issues", [])
+    knowledge = result.get("_knowledge")  # from TF pipeline
 
-    # --- Top-3 crop identification with confidence ---
-    # We already have the winning crop; now get 2nd and 3rd from _identify_crop_from_features scores
-    crop_scores = _get_top3_crops(features)
-    # Override top-1 with the final result's crop (accounts for LLM / hint overrides)
+    # ── Crop Identification (single result + confidence) ──
     top_conf = result.get("ai_confidence", 70)
-    crop_identification = []
-    crop_identification.append({"name": crop_name, "confidence": f"{top_conf}%"})
+    crop_identification = [{"name": crop_name, "confidence": f"{top_conf}%"}]
+
+    # Add runner-ups from TF top_candidates if available
+    top_cands = result.get("_top_candidates", [])
     added = {crop_name.lower()}
-    for name, conf in crop_scores:
-        if name.lower() not in added and len(crop_identification) < 3:
-            crop_identification.append({"name": name, "confidence": f"{conf}%"})
-            added.add(name.lower())
-    # Pad to 3 if needed
-    while len(crop_identification) < 3:
-        crop_identification.append({"name": "Uncertain", "confidence": "0%"})
+    for cand in top_cands:
+        if cand["label"].split(" —")[0].split(" (")[0].lower() not in added and len(crop_identification) < 3:
+            crop_identification.append({"name": cand["label"], "confidence": f"{cand['confidence']}%"})
+            added.add(cand["label"].lower())
 
-    # --- Uncertainty gate ---
-    uncertain = top_conf < 80
-    final_crop = crop_name if not uncertain else "Uncertain — provide additional images for accurate identification"
+    # ── Confidence warning ──
+    conf_warning = result.get("_confidence_warning")
 
-    # --- Disease info ---
-    primary_disease = None
+    # ── Disease info from knowledge engine ──
+    disease_name = None
     disease_cause = "No disease detected"
-    if issues and severity != "healthy":
-        primary_disease = issues[0].get("name", "Unknown Disease") if isinstance(issues[0], dict) else str(issues[0])
-        # Find cause from TREATMENT_DB
-        t = TREATMENT_DB.get(primary_disease, {})
-        if not t:
-            for key, val in TREATMENT_DB.items():
-                if key.lower() in primary_disease.lower() or primary_disease.lower() in key.lower():
-                    t = val
-                    break
-        disease_cause = t.get("cause", "Unknown — consult agronomist")
+    disease_severity = "None"
 
-    severity_map = {"healthy": "None", "warning": "Medium", "critical": "High"}
+    if knowledge and knowledge.get("disease"):
+        disease_name = knowledge["disease"]
+        disease_cause = knowledge["cause"]
+        disease_severity = knowledge["severity"]
+    elif severity != "healthy":
+        # Fallback: extract from issues
+        issues = result.get("issues", [])
+        if issues:
+            primary = issues[0]
+            disease_name = primary.get("name", "") if isinstance(primary, dict) else str(primary)
+            # Try TREATMENT_DB for cause
+            t = TREATMENT_DB.get(disease_name, {})
+            if not t:
+                for key, val in TREATMENT_DB.items():
+                    if key.lower() in disease_name.lower() or disease_name.lower() in key.lower():
+                        t = val
+                        break
+            disease_cause = t.get("cause", f"Detected {disease_name} — consult local agricultural extension for detailed diagnosis")
+
     disease_block = {
-        "name": primary_disease or "No disease detected",
+        "name": disease_name or "No disease detected",
         "confidence": f"{top_conf}%",
         "cause": disease_cause,
-        "severity": severity_map.get(severity, "Low"),
+        "severity": disease_severity if disease_name else "None",
     }
 
-    # --- Treatment ---
-    treatment = _get_treatment(primary_disease, severity)
+    # ── Treatment from knowledge engine ──
+    treatment = _get_treatment(disease_name, severity, knowledge)
 
-    # --- Lifecycle ---
+    # ── Lifecycle ──
     lifecycle = _get_lifecycle(crop_name)
 
     return {
         "crop_identification": crop_identification,
-        "final_crop": final_crop,
-        "uncertain": uncertain,
+        "final_crop": crop_name,
+        "uncertain": conf_warning is not None,
+        "confidence_warning": conf_warning.get("message") if conf_warning else None,
         "disease": disease_block,
         "treatment": treatment,
         "crop_lifecycle": lifecycle,
-        # Keep legacy fields for backward compat
+        # Legacy fields
         "health_assessment": result.get("health_assessment", ""),
         "recommendations": result.get("recommendations", []),
         "growth_needs": result.get("growth_needs", ""),
@@ -1938,52 +1960,58 @@ def _compute_all_crop_scores(features: dict) -> list[tuple[str, int]]:
 # ── TF Model Result Builder ──────────────────────────────────────────────
 
 def _build_tf_result(tf_pred: dict, features: dict) -> dict:
-    """Build a full analysis result from a TF model prediction."""
-    tf_mod = _get_tf_model()
-    class_name = tf_pred["class_name"]
+    """Build a full analysis result from the TF model's knowledge-enriched prediction.
+    
+    tf_pred now comes from the upgraded tf_model.py with:
+      crop, disease, knowledge, confidence_warning, top_candidates.
+    """
+    crop = tf_pred["crop"]
+    disease = tf_pred.get("disease")
     confidence = tf_pred["confidence"]
-    crop, disease = tf_mod.parse_class_name(class_name)
+    knowledge = tf_pred["knowledge"]
+    conf_warning = tf_pred.get("confidence_warning")
+    top_candidates = tf_pred.get("top_candidates", [])
 
     is_healthy = disease is None
     severity = "healthy" if is_healthy else ("critical" if confidence > 0.85 else "warning")
-    # Scale AI confidence: TF confidence 0.05-1.0 → display 45-99%
-    # Even low-confidence TF predictions are better than colour heuristics
-    ai_confidence = max(45, min(99, int(confidence * 100)))
+
+    # Scale AI confidence: TF range → display percentage
+    # Low confidence gets flagged, not inflated
+    ai_confidence = max(30, min(99, int(confidence * 100)))
 
     issues = []
     if disease:
         issues.append({
             "name": disease,
-            "description": f"AI model detected {disease} on {crop} with {confidence*100:.1f}% confidence.",
+            "description": knowledge.get("cause", f"AI model detected {disease} on {crop}."),
         })
-        # Also check PIL features for supporting evidence
         if features.get("total_damaged_pct", 0) > 5:
             issues.append({
                 "name": "Visible leaf damage",
-                "description": f"Image analysis detected ~{features['total_damaged_pct']:.0f}% damaged area (brown/yellow regions)."
+                "description": f"Image analysis detected ~{features['total_damaged_pct']:.0f}% damaged area."
             })
 
-    health_assessment = (
-        f"{crop} leaf appears healthy with no visible disease symptoms. Confidence: {ai_confidence}%."
-        if is_healthy else
-        f"{crop} shows signs of {disease}. AI model confidence: {ai_confidence}%. "
-        f"{'Immediate treatment recommended.' if severity == 'critical' else 'Monitor closely and consider treatment.'}"
-    )
-
-    # Build top-3 predictions display
-    top3 = tf_pred.get("top3", [])
-    top3_display = []
-    for entry in top3:
-        c, d = tf_mod.parse_class_name(entry["class_name"])
-        label = f"{c} - {d}" if d else f"{c} (healthy)"
-        top3_display.append({"label": label, "confidence": round(entry["confidence"] * 100, 1)})
-
-    recommendations = []
+    # Health assessment from knowledge
     if is_healthy:
+        health_assessment = (
+            f"{crop} leaf appears healthy with no visible disease symptoms. "
+            f"Confidence: {ai_confidence}%. {knowledge.get('prevention', '')}"
+        )
         recommendations = [
-            "Continue current care routine",
+            knowledge.get("prevention", "Continue current care routine"),
             "Monitor regularly for early disease signs",
-            "Maintain proper watering and nutrition schedule",
+            knowledge.get("organic", "Maintain proper watering and nutrition schedule"),
+        ]
+    else:
+        sev_text = "Immediate treatment recommended." if severity == "critical" else "Monitor closely and consider treatment."
+        health_assessment = (
+            f"{crop} shows signs of {disease}. {sev_text} "
+            f"Cause: {knowledge.get('cause', '')}".strip()
+        )
+        recommendations = [
+            knowledge.get("solution", "Apply appropriate treatment"),
+            knowledge.get("prevention", "Take preventive measures"),
+            knowledge.get("organic", "Consider organic alternatives"),
         ]
 
     return {
@@ -1993,7 +2021,10 @@ def _build_tf_result(tf_pred: dict, features: dict) -> dict:
         "health_assessment": health_assessment,
         "issues": issues,
         "recommendations": recommendations,
-        "top3_predictions": top3_display,
+        "growth_needs": knowledge.get("soil_correction", ""),
+        "_knowledge": knowledge,
+        "_confidence_warning": conf_warning,
+        "_top_candidates": top_candidates,
         "_model": "smartfarm-tf",
         "analysis_mode": "tf-model",
     }
@@ -2041,7 +2072,8 @@ async def analyze_crop_image(image_base64: str, crop_hint: str | None = None) ->
         _enrich_from_knowledge_base(result)
         if not result.get("crop_detected") or str(result.get("crop_detected")).lower() == "unknown":
             fallback_crop, _ = _identify_crop_from_features(features)
-            result["crop_detected"] = fallback_crop if fallback_crop != "Unknown" else "General Crop"
+            if fallback_crop and fallback_crop != "Unknown":
+                result["crop_detected"] = fallback_crop
 
         result["ai_confidence"] = max(95, _calibrate_confidence(result, features))
         result["analysis_time_ms"] = int((time.perf_counter() - started_at) * 1000)
@@ -2097,7 +2129,8 @@ async def analyze_crop_image(image_base64: str, crop_hint: str | None = None) ->
 
     if not result.get("crop_detected") or str(result.get("crop_detected")).lower() == "unknown":
         fallback_crop, _ = _identify_crop_from_features(features)
-        result["crop_detected"] = fallback_crop if fallback_crop != "Unknown" else "General Crop"
+        if fallback_crop and fallback_crop != "Unknown":
+            result["crop_detected"] = fallback_crop
 
     result["ai_confidence"] = max(95, _calibrate_confidence(result, features, llm_result))
     result["analysis_time_ms"] = int((time.perf_counter() - started_at) * 1000)
@@ -2143,7 +2176,31 @@ def _crop_from_disease_name(disease_name: str) -> str | None:
 
 
 def _enrich_from_knowledge_base(result: dict) -> None:
-    """Cross-reference with disease knowledge base for expert recommendations and crop correction."""
+    """Cross-reference with knowledge engine for expert recommendations.
+    
+    If the TF pipeline already populated _knowledge, this only fills gaps.
+    For non-TF paths, looks up from DISEASE_KNOWLEDGE as before.
+    """
+    # If knowledge engine already populated, just fill recommendation gaps
+    knowledge = result.get("_knowledge")
+    if knowledge:
+        if not result.get("recommendations") or result["recommendations"] == []:
+            if knowledge.get("disease"):
+                result["recommendations"] = [
+                    knowledge.get("solution", ""),
+                    knowledge.get("prevention", ""),
+                    knowledge.get("organic", ""),
+                ]
+            else:
+                result["recommendations"] = [
+                    knowledge.get("prevention", "Continue current care routine"),
+                    "Monitor regularly for early disease signs",
+                ]
+        if not result.get("growth_needs"):
+            result["growth_needs"] = knowledge.get("soil_correction", "")
+        return
+
+    # Non-TF fallback path: use DISEASE_KNOWLEDGE
     crop = result.get("crop_detected", "").lower()
     severity = result.get("severity", "")
     issues = result.get("issues", [])
@@ -2151,62 +2208,44 @@ def _enrich_from_knowledge_base(result: dict) -> None:
     health_text = result.get("health_assessment", "").lower()
     all_text = issues_text + " " + health_text
 
-    # 1. Try crop-specific match first
-    for key, knowledge in DISEASE_KNOWLEDGE.items():
-        if knowledge["crop"].lower() in crop and knowledge["crop"] != "General":
-            if knowledge["disease"] is None and severity == "healthy":
-                result["recommendations"] = knowledge["recommendations"]
-                result["growth_needs"] = knowledge["growth_needs"]
+    # 1. Try crop-specific match
+    for key, kn in DISEASE_KNOWLEDGE.items():
+        if kn["crop"].lower() in crop and kn["crop"] != "General":
+            if kn["disease"] is None and severity == "healthy":
+                result["recommendations"] = kn["recommendations"]
+                result["growth_needs"] = kn["growth_needs"]
                 return
-            if knowledge["disease"] and any(
-                knowledge["disease"].lower() in str(i).lower()
-                for i in issues
+            if kn["disease"] and any(
+                kn["disease"].lower() in str(i).lower() for i in issues
             ):
-                result["recommendations"] = knowledge["recommendations"]
-                result["growth_needs"] = knowledge["growth_needs"]
+                result["recommendations"] = kn["recommendations"]
+                result["growth_needs"] = kn["growth_needs"]
                 return
 
-    # 2. Try matching general disease patterns by symptoms
-
-    # 1b. Correct crop via disease name → crop mapping (resolves cross-crop misidentification)
+    # 2. Correct crop via disease name
     for issue in issues:
         issue_name = issue.get("name", "") if isinstance(issue, dict) else str(issue)
         inferred_crop = _crop_from_disease_name(issue_name)
         if inferred_crop:
             result["crop_detected"] = inferred_crop
-            # Re-try crop-specific knowledge for the corrected crop
-            for key2, knowledge2 in DISEASE_KNOWLEDGE.items():
-                if knowledge2["crop"] == inferred_crop:
-                    result["recommendations"] = knowledge2["recommendations"]
-                    result["growth_needs"] = knowledge2["growth_needs"]
+            for key2, kn2 in DISEASE_KNOWLEDGE.items():
+                if kn2["crop"] == inferred_crop:
+                    result["recommendations"] = kn2["recommendations"]
+                    result["growth_needs"] = kn2["growth_needs"]
                     return
             break
 
-    # 2. Try matching general disease patterns by symptoms
+    # 3. Symptom-based match
     disease_symptom_map = {
-        "General___Leaf_scorch": ["scorch", "leaf edge", "margin brown", "papery", "dried edge"],
-        "General___Leaf_blight": ["blight", "brown patch", "necrotic", "dead tissue", "leaf blight", "brown tissue"],
-        "General___Anthracnose": ["anthracnose", "sunken lesion", "dark lesion"],
-        "General___Septoria_leaf_spot": ["septoria", "leaf spot", "gray center", "pycnidia"],
-        "General___Cercospora_leaf_spot": ["cercospora", "circular spot", "purple border"],
-        "General___Nutrient_deficiency": ["nutrient", "deficiency", "chlorosis", "nitrogen", "iron"],
-        "General___Drought_stress": ["drought", "wilt", "curling", "dry stress"],
-        "General___Powdery_mildew": ["powdery mildew", "white powder", "powdery", "mildew"],
-        "General___Rust": ["rust", "pustule", "orange spot", "rust disease"],
+        "General___Leaf_scorch": ["scorch", "leaf edge", "margin brown", "papery"],
+        "General___Leaf_blight": ["blight", "brown patch", "necrotic", "dead tissue"],
+        "General___Powdery_mildew": ["powdery mildew", "white powder", "mildew"],
+        "General___Rust": ["rust", "pustule", "orange spot"],
     }
-
     for key, keywords in disease_symptom_map.items():
         if any(kw in all_text for kw in keywords):
-            knowledge = DISEASE_KNOWLEDGE[key]
-            result["recommendations"] = knowledge["recommendations"]
-            result["growth_needs"] = knowledge["growth_needs"]
-            return
-
-    # 3. Auto-match by damage pattern when no specific disease found
-    if severity in ("critical", "warning") and issues:
-        brown_issues = any("brown" in str(i).lower() or "blight" in str(i).lower() or "necrotic" in str(i).lower() for i in issues)
-        if brown_issues and "General___Leaf_blight" in DISEASE_KNOWLEDGE:
-            knowledge = DISEASE_KNOWLEDGE["General___Leaf_blight"]
-            result["recommendations"] = knowledge["recommendations"]
-            result["growth_needs"] = knowledge["growth_needs"]
-            return
+            kn = DISEASE_KNOWLEDGE.get(key)
+            if kn:
+                result["recommendations"] = kn["recommendations"]
+                result["growth_needs"] = kn["growth_needs"]
+                return

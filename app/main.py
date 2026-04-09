@@ -153,7 +153,7 @@ async def analyze_crop(payload: CropImagePayload):
 
     now = datetime.utcnow().isoformat()
     severity = str(result.get("severity") or "warning")
-    crop_name = str(result.get("crop_detected") or "General Crop")
+    crop_name = str(result.get("crop_detected") or "Crop")
     health_txt = str(result.get("health_assessment") or "")
     confidence = float(result.get("ai_confidence") or 95.0)
     model_used = str(result.get("_model") or "unknown")
