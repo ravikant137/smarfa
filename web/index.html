@@ -848,13 +848,70 @@ async function loadReports() {
       renderTrend('trend-height', 'trend-height-labels', d.daily_trends, 'avg_height');
     }
 
-    // Alert breakdown
+
+    // Alert breakdown (categories)
     var typesEl = document.getElementById('r-alert-types');
-    var typeColors = {moisture_warning:'var(--blue)',temp_warning:'var(--red)',growth_drop:'var(--yellow)',growth_slow:'var(--yellow)',intrusion_alarm:'var(--red)',pump_auto_start:'var(--cyan)'};
-    var entries = Object.entries(d.alert_breakdown);
+    var typeColors = {moisture_warning:'var(--blue)',temp_warning:'var(--red)',growth_drop:'var(--yellow)',growth_slow:'var(--yellow)',intrusion_alarm:'var(--red)',pump_auto_start:'var(--cyan)', crop_warning:'var(--yellow)', crop_critical:'var(--red)', crop_healthy:'var(--green)'};
+    var entries = Object.entries(d.alert_breakdown || {});
     typesEl.innerHTML = entries.length ? entries.map(function(e) {
-      return '<div class="alert-type-badge" style="border-color:' + (typeColors[e[0]]||'var(--border)') + ';color:' + (typeColors[e[0]]||'var(--muted)') + '">' + e[0].replace(/_/g,' ') + ': ' + e[1] + '</div>';
+      return '<div class="alert-type-badge" style="border-color:' + (typeColors[e[0]]||'var(--border)') + ';color:' + (typeColors[e[0]]||'var(--muted)') + ';cursor:pointer" onclick="showAlertDetails(\'' + e[0] + '\')">' + e[0].replace(/_/g,' ') + ': ' + e[1] + '</div>';
     }).join('') : '<span style="color:var(--muted);font-size:13px">No alerts this week</span>';
+
+    // Modal for alert details (if not present)
+    if (!document.getElementById('alert-details-modal')) {
+      var modal = document.createElement('div');
+      modal.id = 'alert-details-modal';
+      modal.style = 'display:none;position:fixed;z-index:2000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;';
+      modal.innerHTML = '<div style="background:#1E2333;padding:32px 24px;border-radius:18px;max-width:420px;width:95vw;max-height:80vh;overflow:auto;box-shadow:0 8px 32px #0008;position:relative">'
+        + '<button onclick="hideAlertDetails()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;color:#fff;cursor:pointer">&times;</button>'
+        + '<h2 id="alert-details-title" style="font-size:20px;margin-bottom:18px;color:#10B981"></h2>'
+        + '<div id="alert-details-list"></div>'
+        + '</div>';
+      document.body.appendChild(modal);
+    }
+
+    // Add modal for alert details if not present
+    if (!document.getElementById('alert-details-modal')) {
+      var modal = document.createElement('div');
+      modal.id = 'alert-details-modal';
+      modal.style = 'display:none;position:fixed;z-index:2000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;';
+      modal.innerHTML = '<div style="background:#1E2333;padding:32px 24px;border-radius:18px;max-width:420px;width:95vw;max-height:80vh;overflow:auto;box-shadow:0 8px 32px #0008;position:relative">'
+        + '<button onclick="hideAlertDetails()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;color:#fff;cursor:pointer">&times;</button>'
+        + '<h2 id="alert-details-title" style="font-size:20px;margin-bottom:18px;color:#10B981"></h2>'
+        + '<div id="alert-details-list"></div>'
+        + '</div>';
+      document.body.appendChild(modal);
+    }
+// Show alert details modal for a category
+async function showAlertDetails(category) {
+  var modal = document.getElementById('alert-details-modal');
+  var title = document.getElementById('alert-details-title');
+  var list = document.getElementById('alert-details-list');
+  title.textContent = category.replace(/_/g, ' ').toUpperCase() + ' Alerts';
+  list.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><p>Loading alerts...</p></div>';
+  modal.style.display = 'flex';
+  try {
+    // Fetch alerts by type from backend
+    var alerts = await fetch(API + '/alerts/by_type/' + encodeURIComponent(category)).then(r => r.json());
+    if (!alerts.length) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">🔔</div><p>No alerts in this category.</p></div>';
+    } else {
+      list.innerHTML = alerts.map(function(a) {
+        return '<div class="alert-item ' + a.type + '">' +
+          '<div style="font-size:13px;color:var(--muted);margin-bottom:2px">' + new Date(a.timestamp).toLocaleString() + '</div>' +
+          '<div class="msg">' + esc(a.message) + '</div>' +
+          '</div>';
+      }).join('');
+    }
+  } catch(e) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>Error loading alerts.</p></div>';
+  }
+}
+
+function hideAlertDetails() {
+  var modal = document.getElementById('alert-details-modal');
+  if (modal) modal.style.display = 'none';
+}
 
     // Recent AI Scans
     if (d.recent_scans && d.recent_scans.length) {
