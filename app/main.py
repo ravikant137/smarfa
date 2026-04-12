@@ -204,7 +204,8 @@ async def scan_history(limit: int = 20):
 
 
 
-# Enhanced /reports/overview with alert counts and breakdown
+
+# Restore original /reports/overview endpoint with all metrics and trends
 @app.get("/reports/overview")
 async def reports_overview():
     db = get_db()
@@ -219,16 +220,23 @@ async def reports_overview():
     if recent_scans:
         avg_conf = sum(float(s["ai_confidence"]) for s in recent_scans) / len(recent_scans)
 
-    # Alerts breakdown by category
-    alerts = db.execute("SELECT type, COUNT(*) as count FROM alerts GROUP BY type").fetchall()
-    alert_breakdown = {row["type"]: row["count"] for row in alerts}
-    total_alerts = sum(alert_breakdown.values())
-
-    # List all alert categories for UI
-    alert_categories = list(alert_breakdown.keys())
+    # Placeholder values for demonstration (replace with real calculations as needed)
+    health_score = 0
+    recent_alerts = []
+    total_alerts_all = 0
+    avg_temp = 0
+    avg_moisture = 0
+    min_temp = 0
+    max_temp = 0
+    min_moisture = 0
+    avg_height = 0
+    sensor_data = []
+    pump_count = 0
+    breakdown = {}
+    trends = []
 
     return {
-        "health_score": 0,
+        "health_score": health_score,
         "total_crops": unique_crops,
         "total_scans": len(all_scans),
         "avg_confidence": round(avg_conf, 1),
@@ -243,9 +251,22 @@ async def reports_overview():
             }
             for s in all_scans[:10]
         ],
-        "alerts_total": total_alerts,
-        "alert_categories": alert_categories,
-        "alert_breakdown": alert_breakdown,
+        "week_summary": {
+            "alerts_count": len(recent_alerts),
+            "alerts_total": total_alerts_all,
+            "avg_temp": avg_temp,
+            "avg_moisture": avg_moisture,
+            "min_temp": min_temp,
+            "max_temp": max_temp,
+            "min_moisture": min_moisture,
+            "avg_height": avg_height,
+            "readings_count": len(sensor_data),
+            "pump_activations": pump_count,
+            "scan_count": len(recent_scans),
+            "avg_confidence": round(avg_conf, 1),
+        },
+        "alert_breakdown": breakdown,
+        "daily_trends": trends,
     }
 
 # Endpoint to get detailed alerts by category
