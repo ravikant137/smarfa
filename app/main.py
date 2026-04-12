@@ -203,6 +203,8 @@ async def scan_history(limit: int = 20):
     ]
 
 
+
+# Enhanced /reports/overview with alert counts and breakdown
 @app.get("/reports/overview")
 async def reports_overview():
     db = get_db()
@@ -214,27 +216,19 @@ async def reports_overview():
 
     unique_crops = len(set(s["crop_detected"] for s in all_scans))
     avg_conf = 0.0
-    # Calculate average confidence for recent scans
     if recent_scans:
         avg_conf = sum(float(s["ai_confidence"]) for s in recent_scans) / len(recent_scans)
 
-    # Placeholder values for demonstration (replace with real calculations as needed)
-    health_score = 0
-    recent_alerts = []
-    total_alerts_all = 0
-    avg_temp = 0
-    avg_moisture = 0
-    min_temp = 0
-    max_temp = 0
-    min_moisture = 0
-    avg_height = 0
-    sensor_data = []
-    pump_count = 0
-    breakdown = {}
-    trends = []
+    # Alerts breakdown by category
+    alerts = db.execute("SELECT type, COUNT(*) as count FROM alerts GROUP BY type").fetchall()
+    alert_breakdown = {row["type"]: row["count"] for row in alerts}
+    total_alerts = sum(alert_breakdown.values())
+
+    # List all alert categories for UI
+    alert_categories = list(alert_breakdown.keys())
 
     return {
-        "health_score": health_score,
+        "health_score": 0,
         "total_crops": unique_crops,
         "total_scans": len(all_scans),
         "avg_confidence": round(avg_conf, 1),
@@ -249,23 +243,17 @@ async def reports_overview():
             }
             for s in all_scans[:10]
         ],
-        "week_summary": {
-            "alerts_count": len(recent_alerts),
-            "alerts_total": total_alerts_all,
-            "avg_temp": avg_temp,
-            "avg_moisture": avg_moisture,
-            "min_temp": min_temp,
-            "max_temp": max_temp,
-            "min_moisture": min_moisture,
-            "avg_height": avg_height,
-            "readings_count": len(sensor_data),
-            "pump_activations": pump_count,
-            "scan_count": len(recent_scans),
-            "avg_confidence": round(avg_conf, 1),
-        },
-        "alert_breakdown": breakdown,
-        "daily_trends": trends,
+        "alerts_total": total_alerts,
+        "alert_categories": alert_categories,
+        "alert_breakdown": alert_breakdown,
     }
+
+# Endpoint to get detailed alerts by category
+@app.get("/alerts/by_type/{alert_type}")
+async def alerts_by_type(alert_type: str):
+    db = get_db()
+    rows = db.execute("SELECT * FROM alerts WHERE type=? ORDER BY timestamp DESC", (alert_type,)).fetchall()
+    return [dict(r) for r in rows]
 
 
 # ── Water Pump Control ────────────────────────────────────────────────────
