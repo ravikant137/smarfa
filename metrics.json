@@ -1,7 +1,0 @@
-{
-    "status": "active",
-    "epoch": 1,
-    "train_loss": [0.85, 0.72, 0.61, 0.52],
-    "val_accuracy_binary": [0.65, 0.72, 0.78, 0.81],
-    "val_accuracy_species": [0.32, 0.45, 0.52, 0.58]
-}
