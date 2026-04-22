@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartFarm AI - ML Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2ECC71;
+            --secondary: #3498DB;
+            --dark: #1A1A1A;
+            --light: #F4F7F6;
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #1a2a6c, #b21f1f, #fdbb2d);
+            background-attachment: fixed;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
+            background: var(--glass);
+            padding: 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 { margin: 0; font-weight: 700; letter-spacing: -1px; }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            background: var(--primary);
+            font-size: 0.8rem;
+            margin-top: 10px;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 25px;
+        }
+
+        .card {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border-radius: 25px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover { transform: translateY(-5px); }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 10px 0;
+            color: var(--primary);
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            text-transform: uppercase;
+        }
+
+        canvas { max-width: 100%; height: auto !important; }
+
+        .ablation-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .ablation-table th, .ablation-table td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .ablation-table th { color: var(--secondary); font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌾 SmarFarm AI ML Dashboard</h1>
+            <div id="status" class="status-badge">Training Active</div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="metric-label">Current Epoch</div>
+                <div id="latest-epoch" class="metric-value">0</div>
+                <div id="latest-loss" style="font-size: 1rem;">Loss: 0.000</div>
+            </div>
+
+            <div class="card">
+                <div class="metric-label">Binary Accuracy (Crop/Weed)</div>
+                <div id="binary-acc" class="metric-value">0%</div>
+                <div style="font-size: 1rem; color: #2ECC71;">Target: >95%</div>
+            </div>
+
+            <div class="card">
+                <h3>Training Loss Trend</h3>
+                <canvas id="lossChart"></canvas>
+            </div>
+
+            <div class="card">
+                <h3>Accuracy Progress (Binary vs Species)</h3>
+                <canvas id="accuracyChart"></canvas>
+            </div>
+
+            <div class="card" style="grid-column: 1 / -1;">
+                <h3>Ablation Study: Architecture Comparison</h3>
+                <table class="ablation-table">
+                    <thead>
+                        <tr>
+                            <th>Backbone</th>
+                            <th>Ablation Task</th>
+                            <th>VRAM Usage</th>
+                            <th>Binary Accuracy</th>
+                            <th>Species Accuracy</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ablation-body">
+                        <tr>
+                            <td>EfficientNetV2-S</td>
+                            <td>Baseline LoRA</td>
+                            <td>1.2 GB</td>
+                            <td>--</td>
+                            <td>--</td>
+                            <td>Scheduled</td>
+                        </tr>
+                        <tr>
+                            <td>SwinV2-Tiny</td>
+                            <td>iNatAg Optimized</td>
+                            <td>1.8 GB</td>
+                            <td>--</td>
+                            <td>--</td>
+                            <td>Scheduled</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ctxLoss = document.getElementById('lossChart').getContext('2d');
+        const ctxAcc = document.getElementById('accuracyChart').getContext('2d');
+
+        const lossChart = new Chart(ctxLoss, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Train Loss',
+                    data: [],
+                    borderColor: '#3498DB',
+                    tension: 0.4,
+                    fill: true,
+                    backgroundColor: 'rgba(52, 152, 219, 0.2)'
+                }]
+            },
+            options: { responsive: true, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' } } } }
+        });
+
+        const accuracyChart = new Chart(ctxAcc, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Binary Acc',
+                        data: [],
+                        borderColor: '#2ECC71',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Species Acc',
+                        data: [],
+                        borderColor: '#F1C40F',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: { responsive: true, scales: { y: { min: 40, max: 100, grid: { color: 'rgba(255,255,255,0.1)' } } } }
+        });
+
+        function updateMetrics() {
+            fetch('/api/metrics')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'active' || data.status === 'done') {
+                        document.getElementById('latest-epoch').innerText = data.epoch;
+                        document.getElementById('latest-loss').innerText = `Loss: ${data.train_loss[data.train_loss.length - 1].toFixed(4)}`;
+                        
+                        const latestBinary = data.val_accuracy_binary[data.val_accuracy_binary.length - 1];
+                        document.getElementById('binary-acc').innerText = `${(latestBinary * 100).toFixed(1)}%`;
+                        
+                        // Update Charts
+                        const labels = Array.from({length: data.train_loss.length}, (_, i) => i + 1);
+                        lossChart.data.labels = labels;
+                        lossChart.data.datasets[0].data = data.train_loss;
+                        lossChart.update();
+
+                        accuracyChart.data.labels = labels;
+                        accuracyChart.data.datasets[0].data = data.val_accuracy_binary.map(a => a * 100);
+                        accuracyChart.data.datasets[1].data = data.val_accuracy_species.map(a => a * 100);
+                        accuracyChart.update();
+                    }
+                });
+        }
+
+        setInterval(updateMetrics, 5000);
+        updateMetrics();
+    </script>
+</body>
+</html>
