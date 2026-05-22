@@ -30,8 +30,8 @@ MODEL_PATH = os.path.join(MODEL_DIR, "smartfarm_model.h5")
 TFLITE_PATH = os.path.join(MODEL_DIR, "smartfarm_model.tflite")
 CLASS_NAMES_PATH = os.path.join(MODEL_DIR, "class_names.json")
 
-PHASE1_EPOCHS = 15
-PHASE2_EPOCHS = 20
+PHASE1_EPOCHS = 1
+PHASE2_EPOCHS = 1
 PHASE1_LR = 1e-3
 PHASE2_LR = 1e-5
 FINE_TUNE_AT = 100  # Unfreeze layers from this index onward in base model
