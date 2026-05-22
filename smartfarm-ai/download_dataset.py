@@ -8,21 +8,31 @@ import shutil
 DATASET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset")
 
 # Public PlantVillage mirror (GitHub release / Kaggle-compatible)
-DATASET_URL = "https://data.mendeley.com/public-files/datasets/tywbtsjrjv/files/d5652a28-c1d8-4b76-97f3-72fb80f94efc/file_downloaded"
+PLANTVILLAGE_URL = "https://data.mendeley.com/public-files/datasets/tywbtsjrjv/files/d5652a28-c1d8-4b76-97f3-72fb80f94efc/file_downloaded"
+
+# Additional Real-World Datasets
+# Note: For production, kaggle API is recommended to download these datasets directly.
+# PlantDoc (Real-world images with complex backgrounds)
+PLANTDOC_KAGGLE = "kaggle datasets download -d mingled/plantdoc-dataset"
+# Paddy Doctor (Rice diseases in field conditions)
+PADDY_DOCTOR_KAGGLE = "kaggle competitions download -c paddy-disease-classification"
+# Cassava Disease (Real-world cassava images)
+CASSAVA_KAGGLE = "kaggle competitions download -c cassava-leaf-disease-classification"
 
 def download_dataset():
+    print("[INFO] Starting Dataset Integration Pipeline...")
     zip_path = os.path.join(os.path.dirname(DATASET_DIR), "plantvillage.zip")
     
     if os.path.exists(DATASET_DIR) and len(os.listdir(DATASET_DIR)) > 5:
         print(f"[INFO] Dataset already exists at {DATASET_DIR} with {len(os.listdir(DATASET_DIR))} classes. Skipping download.")
         return
     
-    print(f"[INFO] Downloading PlantVillage dataset...")
-    print(f"[INFO] URL: {DATASET_URL}")
+    print(f"[INFO] Downloading PlantVillage dataset (Clean lab dataset)...")
+    print(f"[INFO] URL: {PLANTVILLAGE_URL}")
     print(f"[INFO] This may take several minutes...")
     
     try:
-        urllib.request.urlretrieve(DATASET_URL, zip_path, _progress)
+        urllib.request.urlretrieve(PLANTVILLAGE_URL, zip_path, _progress)
         print(f"\n[INFO] Download complete. Extracting...")
     except Exception as e:
         print(f"\n[ERROR] Download failed: {e}")
@@ -71,6 +81,16 @@ def download_dataset():
     
     classes = [d for d in os.listdir(DATASET_DIR) if os.path.isdir(os.path.join(DATASET_DIR, d))]
     print(f"[INFO] Dataset ready: {len(classes)} classes")
+    
+    print("\n[INFO] ========================================================")
+    print("[INFO] To improve real-world robustness, you MUST integrate:")
+    print(f"[INFO] 1. PlantDoc Dataset: run `{PLANTDOC_KAGGLE}`")
+    print(f"[INFO] 2. Paddy Doctor: run `{PADDY_DOCTOR_KAGGLE}`")
+    print(f"[INFO] 3. Cassava Disease: run `{CASSAVA_KAGGLE}`")
+    print("[INFO] Extract them into the `dataset/` directory to combine clean")
+    print("[INFO] and real-world datasets for better generalization.")
+    print("[INFO] ========================================================\n")
+    
     for c in sorted(classes)[:10]:
         count = len(os.listdir(os.path.join(DATASET_DIR, c)))
         print(f"  {c}: {count} images")

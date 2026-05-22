@@ -2025,6 +2025,7 @@ def _build_tf_result(tf_pred: dict, features: dict) -> dict:
         "_knowledge": knowledge,
         "_confidence_warning": conf_warning,
         "_top_candidates": top_candidates,
+        "rejected": tf_pred.get("rejected", False),
         "_model": "smartfarm-tf",
         "analysis_mode": "tf-model",
     }

@@ -210,6 +210,21 @@ def _predict_from_bytes(image_bytes: bytes) -> dict:
                 best = cand
                 break
 
+    # ── Confidence thresholding ───────────────────────────────────────
+    CONFIDENCE_THRESHOLD = 0.45
+    if best["confidence"] < CONFIDENCE_THRESHOLD:
+        logger.warning(f"[SmartFarm TF] Low confidence prediction ({best['confidence']:.2f}). Rejecting.")
+        return {
+            "class_name": "Unknown",
+            "confidence": best["confidence"],
+            "crop": "Unknown",
+            "disease": None,
+            "knowledge": get_knowledge("Background_without_leaves"),
+            "confidence_warning": "Unsupported or unclear crop image. Please provide a clearer image of a supported crop leaf.",
+            "top_candidates": [{"label": "Unknown", "confidence": round(best["confidence"] * 100, 1)}],
+            "rejected": True
+        }
+
     # ── Knowledge lookup ──────────────────────────────────────────────
     knowledge = get_knowledge(best["class_name"])
 

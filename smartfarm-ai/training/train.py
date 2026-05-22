@@ -1,7 +1,7 @@
 """
 SmartFarm AI - Training Pipeline
-Transfer learning with EfficientNetB0 + fine-tuning for crop disease detection.
-Optimized for real-world farm images.
+Production-grade transfer learning with EfficientNetV2B3 + fine-tuning for crop disease detection.
+Optimized for real-world farm images with advanced augmentation and mixed precision.
 """
 
 import os
@@ -13,6 +13,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, callbacks, mixed_precision
 from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.utils.class_weight import compute_class_weight
 
 # Add project root to path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,11 +31,11 @@ MODEL_PATH = os.path.join(MODEL_DIR, "smartfarm_model.h5")
 TFLITE_PATH = os.path.join(MODEL_DIR, "smartfarm_model.tflite")
 CLASS_NAMES_PATH = os.path.join(MODEL_DIR, "class_names.json")
 
-PHASE1_EPOCHS = 1
-PHASE2_EPOCHS = 1
+PHASE1_EPOCHS = 20
+PHASE2_EPOCHS = 30
 PHASE1_LR = 1e-3
 PHASE2_LR = 1e-5
-FINE_TUNE_AT = 100  # Unfreeze layers from this index onward in base model
+FINE_TUNE_AT = 150  # Unfreeze layers from this index onward in base model
 
 
 # ---------------------------------------------------------------------------
@@ -56,19 +57,23 @@ def setup_gpu():
 # Model builder
 # ---------------------------------------------------------------------------
 def build_model(num_classes: int, img_size: tuple = IMG_SIZE) -> keras.Model:
-    """Build an EfficientNetB0-based transfer learning model."""
-    base_model = tf.keras.applications.EfficientNetB0(
+    """Build an EfficientNetV2B3-based transfer learning model."""
+    base_model = tf.keras.applications.EfficientNetV2B3(
         include_top=False,
         weights="imagenet",
         input_shape=(*img_size, 3),
+        include_preprocessing=True
     )
     base_model.trainable = False  # Freeze all base layers for Phase 1
 
     inputs = keras.Input(shape=(*img_size, 3))
     x = base_model(inputs, training=False)
     x = layers.GlobalAveragePooling2D()(x)
-    x = layers.Dense(256, activation="relu")(x)
-    x = layers.Dropout(0.5)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dense(512, activation="silu")(x)
+    x = layers.Dropout(0.4)(x)
+    x = layers.Dense(256, activation="silu")(x)
+    x = layers.Dropout(0.3)(x)
     # Ensure float32 output for numerical stability with mixed precision
     outputs = layers.Dense(num_classes, activation="softmax", dtype="float32")(x)
 
@@ -84,10 +89,10 @@ def get_callbacks(phase: str = "phase1") -> list:
     os.makedirs(MODEL_DIR, exist_ok=True)
     return [
         callbacks.EarlyStopping(
-            monitor="val_accuracy", patience=3, restore_best_weights=True, verbose=1
+            monitor="val_accuracy", patience=5, restore_best_weights=True, verbose=1
         ),
         callbacks.ReduceLROnPlateau(
-            monitor="val_loss", factor=0.5, patience=2, min_lr=1e-7, verbose=1
+            monitor="val_loss", factor=0.5, patience=3, min_lr=1e-7, verbose=1
         ),
         callbacks.ModelCheckpoint(
             MODEL_PATH, monitor="val_accuracy", save_best_only=True, verbose=1
@@ -105,9 +110,10 @@ def evaluate_model(model: keras.Model, val_generator, class_names: list):
     print("=" * 60)
 
     # Evaluate
-    loss, acc = model.evaluate(val_generator, verbose=0)
+    loss, acc, top3_acc = model.evaluate(val_generator, verbose=0)
     print(f"\nValidation Loss : {loss:.4f}")
     print(f"Validation Accuracy: {acc:.4f}  ({acc * 100:.1f}%)")
+    print(f"Top-3 Accuracy     : {top3_acc:.4f}  ({top3_acc * 100:.1f}%)")
 
     # Predictions
     val_generator.reset()
@@ -153,7 +159,7 @@ def convert_to_tflite(model_path: str = MODEL_PATH, output_path: str = TFLITE_PA
 # Main training loop
 # ---------------------------------------------------------------------------
 def train(dataset_dir: str, batch_size: int, skip_tflite: bool = False):
-    """Full two-phase training pipeline."""
+    """Full two-phase training pipeline with class balancing."""
     setup_gpu()
 
     # ── Data ──────────────────────────────────────────────────────────
@@ -163,6 +169,12 @@ def train(dataset_dir: str, batch_size: int, skip_tflite: bool = False):
     print(f"[INFO] Found {num_classes} classes: {class_names[:10]}{'...' if num_classes > 10 else ''}")
     print(f"[INFO] Training samples : {train_gen.samples}")
     print(f"[INFO] Validation samples: {val_gen.samples}")
+
+    # Compute class weights
+    class_weights = compute_class_weight(
+        "balanced", classes=np.unique(train_gen.classes), y=train_gen.classes
+    )
+    class_weight_dict = dict(enumerate(class_weights))
 
     # Save class names for inference
     os.makedirs(MODEL_DIR, exist_ok=True)
@@ -181,8 +193,8 @@ def train(dataset_dir: str, batch_size: int, skip_tflite: bool = False):
 
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=PHASE1_LR),
-        loss="categorical_crossentropy",
-        metrics=["accuracy"],
+        loss=keras.losses.CategoricalCrossentropy(label_smoothing=0.1),
+        metrics=["accuracy", keras.metrics.TopKCategoricalAccuracy(k=3, name="top3_acc")],
     )
 
     model.fit(
@@ -190,6 +202,7 @@ def train(dataset_dir: str, batch_size: int, skip_tflite: bool = False):
         validation_data=val_gen,
         epochs=PHASE1_EPOCHS,
         callbacks=get_callbacks("phase1"),
+        class_weight=class_weight_dict,
     )
 
     # ── Phase 2: Fine-tune ────────────────────────────────────────────
@@ -203,8 +216,8 @@ def train(dataset_dir: str, batch_size: int, skip_tflite: bool = False):
 
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=PHASE2_LR),
-        loss="categorical_crossentropy",
-        metrics=["accuracy"],
+        loss=keras.losses.CategoricalCrossentropy(label_smoothing=0.1),
+        metrics=["accuracy", keras.metrics.TopKCategoricalAccuracy(k=3, name="top3_acc")],
     )
 
     model.fit(
@@ -212,6 +225,7 @@ def train(dataset_dir: str, batch_size: int, skip_tflite: bool = False):
         validation_data=val_gen,
         epochs=PHASE2_EPOCHS,
         callbacks=get_callbacks("phase2"),
+        class_weight=class_weight_dict,
     )
 
     # ── Evaluation ────────────────────────────────────────────────────
