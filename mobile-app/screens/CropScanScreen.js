@@ -100,7 +100,7 @@ export default function CropScanScreen() {
   return (
     <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <GradientHeader subtitle="AI-powered crop health analysis" />
+        <GradientHeader subtitle="AI auto-detects crop type & diseases" />
         <Animated.View style={{ opacity: fadeAnim }}>
           {image ? (
             <View style={styles.imageContainer}>
@@ -134,7 +134,7 @@ export default function CropScanScreen() {
           {loading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#10B981" />
-              <Text style={styles.loadingText}>AI is analyzing your crop...</Text>
+              <Text style={styles.loadingText}>AI is identifying your crop &amp; diagnosing...</Text>
             </View>
           )}
 
