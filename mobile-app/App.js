@@ -5,12 +5,15 @@ import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './navigation/AppNavigator';
 
 export default function App() {
-  if (Platform.OS === 'web') {
-    return <StaticAuthUI />;
+  const [isAuthenticated, setIsAuthenticated] = React.useState(Platform.OS !== 'web');
+
+  if (!isAuthenticated && Platform.OS === 'web') {
+    return <StaticAuthUI onAuth={() => setIsAuthenticated(true)} />;
   }
+
   return (
     <NavigationContainer>
-      <AppNavigator />
+      <AppNavigator initialRoute={Platform.OS === 'web' ? 'Home' : 'Login'} />
     </NavigationContainer>
   );
 }

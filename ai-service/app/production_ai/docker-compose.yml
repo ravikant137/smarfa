@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  smarfa-api:
+    build: 
+      context: ../..
+      dockerfile: app/production_ai/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=postgres-db
+    volumes:
+      - ./data_retraining:/workspace/data_retraining
+    depends_on:
+      - postgres-db
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  postgres-db:
+    image: postgis/postgis:15-3.3
+    environment:
+      - POSTGRES_DB=smartfarm_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=securepass123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

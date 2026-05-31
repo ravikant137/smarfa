@@ -76,9 +76,9 @@ function MainTabs({ route }) {
   );
 }
 
-export default function AppNavigator() {
+export default function AppNavigator({ initialRoute = 'Login' }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="Home" component={MainTabs} />

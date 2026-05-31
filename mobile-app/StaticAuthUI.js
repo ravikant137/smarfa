@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function StaticAuthUI() {
+export default function StaticAuthUI(props) {
   const [tab, setTab] = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +35,7 @@ export default function StaticAuthUI() {
     }
     setLoading(true);
     try {
-      const API = 'http://localhost:8001'; // Update this if your backend runs elsewhere
+      const API = 'http://localhost:8000'; // Update this if your backend runs elsewhere
       const endpoint = tab === 'register' ? '/register' : '/login';
       const res = await fetch(API + endpoint, {
         method: 'POST',
@@ -44,8 +44,8 @@ export default function StaticAuthUI() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Authentication failed');
-      // Success: reload or redirect as needed
-      window.location.reload();
+      // Success: transition to the main app
+      if (props.onAuth) props.onAuth();
     } catch (err) {
       setError(err.message);
     } finally {

@@ -7,6 +7,8 @@ Maps every PlantVillage class to expert-level agronomic data:
 NEVER returns "Unknown" — every class has a validated knowledge entry.
 """
 
+from typing import Union, Optional
+
 # ── Crop → Valid Diseases mapping (two-stage validation) ──────────────────
 # Only these disease/crop combinations are valid. If the model predicts a
 # disease that doesn't belong to the identified crop, the result is rejected.
@@ -36,6 +38,9 @@ CROP_DISEASE_MAP = {
         "Bacterial Spot", "Early Blight", "Late Blight", "Leaf Mold",
         "Septoria Leaf Spot", "Spider Mites (Two-Spotted Spider Mite)",
         "Target Spot", "Yellow Leaf Curl Virus", "Mosaic Virus", None,
+    ],
+    "Wheat": [
+        "Stripe Rust", "Leaf Rust", None,
     ],
 }
 
@@ -563,7 +568,47 @@ KNOWLEDGE_BASE = {
         "irrigation": "1-2 inches/week via drip irrigation. Consistent moisture — irregular watering causes blossom end rot and cracking.",
         "soil_correction": "pH 6.0-6.8. Rich well-drained soil. Add calcium (gypsum) if blossom end rot occurs.",
     },
+    "Wheat___Stripe_rust": {
+        "crop": "Wheat",
+        "disease": "Stripe Rust",
+        "cause": "Fungal infection (Puccinia striiformis) — characterized by yellow-orange pustules arranged in linear stripes along the leaves; thrives in cool, humid conditions",
+        "severity": "High",
+        "solution": "Apply propiconazole or tebuconazole fungicide at early flag leaf stage. Plant resistant wheat varieties. Avoid high nitrogen levels which promote dense vegetative growth.",
+        "prevention": "Plant stripe rust-resistant cultivars. Rotate crops with non-cereal crops. Inspect fields regularly during early spring.",
+        "organic": "Apply neem oil or baking soda spray every 7 days as a preventive barrier. Ensure wider seed spacing to improve airflow.",
+        "chemical": "Propiconazole (Tilt) 250EC (0.5L/ha) or Azoxystrobin (Amistar) at label rate",
+        "dosage": "Propiconazole: 0.5L per hectare, spray at first sign of stripe rust on upper leaves",
+        "irrigation": "Avoid excessive overhead irrigation. Use drip or timed morning irrigation.",
+        "soil_correction": "Avoid excessive nitrogen application. Balanced phosphorus and potassium levels are required.",
+    },
+    "Wheat___Leaf_rust": {
+        "crop": "Wheat",
+        "disease": "Leaf Rust",
+        "cause": "Fungal infection (Puccinia triticina) — characterized by small, round orange-brown pustules scattered across the leaf surface; favored by warm, damp weather",
+        "severity": "Medium",
+        "solution": "Apply triadimefon or tebuconazole fungicide. Eradicate alternative hosts near fields.",
+        "prevention": "Grow leaf rust-resistant varieties. Adjust planting date to avoid peak rust seasons.",
+        "organic": "Apply sulfur-based organic sprays or copper fungicides early in the season.",
+        "chemical": "Triadimefon 25WP at 1.5g/L or Tebuconazole 250EC at 0.5L/ha",
+        "dosage": "Tebuconazole: 0.5L per hectare, spray at flag leaf stage if infection pressure is high",
+        "irrigation": "Manage field drainage to prevent prolonged humidity inside the crop canopy.",
+        "soil_correction": "Maintain optimal soil fertility. High phosphorus encourages strong cell walls.",
+    },
+    "Wheat___healthy": {
+        "crop": "Wheat",
+        "disease": None,
+        "cause": "No disease — plant is healthy",
+        "severity": "None",
+        "solution": "No treatment needed. Maintain healthy cultivation routines.",
+        "prevention": "Maintain crop rotation. Apply balanced nutrition.",
+        "organic": "Use high-quality organic compost.",
+        "chemical": "None",
+        "dosage": "Standard maintenance: balanced NPK fertilization.",
+        "irrigation": "Regular watering based on crop stage (critical during tillering and booting).",
+        "soil_correction": "Maintain soil pH 6.0-7.0. Ensure well-aerated soil structure.",
+    },
 }
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Confidence-based messaging
@@ -638,7 +683,7 @@ def get_knowledge(class_name: str) -> dict:
     }
 
 
-def validate_crop_disease(crop: str, disease: str | None) -> bool:
+def validate_crop_disease(crop: str, disease: Optional[str]) -> bool:
     """Two-stage validation: check if disease belongs to this crop.
     
     Returns True if the combination is valid.
@@ -651,7 +696,7 @@ def validate_crop_disease(crop: str, disease: str | None) -> bool:
     return any(d and disease.lower() in d.lower() for d in valid if d)
 
 
-def get_confidence_message(confidence: float) -> dict | None:
+def get_confidence_message(confidence: float) -> Optional[dict]:
     """Return a warning message if confidence is below threshold.
     
     Returns None if confidence is high enough.

@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_ADDR=redis:6379
+      - AI_SERVICE_URL=http://ai-service:8001/internal/analyze
+    depends_on:
+      - redis
+      - ai-service
+
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "8001:8001"
+    environment:
+      # If using Ollama locally on Mac, use host.docker.internal
+      - OLLAMA_HOST=http://host.docker.internal:11434
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  # Note: Postgres omitted for brevity, but can be added here

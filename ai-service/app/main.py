@@ -20,6 +20,7 @@
 # ...existing endpoints...
 
 
+from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -35,6 +36,7 @@ from app.sensors import process_growth_reading, process_intrusion_reading
 from app.config import settings
 from app.mobile import register_device, list_devices, send_push
 from app.crop_ai import analyze_crop_image, CROP_LIFECYCLE, TREATMENT_DB
+from app.production_ai.api_v2.main_v2 import router as api_v2_router
 
 
 def hash_password(password: str) -> str:
@@ -45,11 +47,130 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
 app = FastAPI(title="Smart AI Farming")
+app.include_router(api_v2_router)
+
+def seed_mock_data(db):
+    cnt = db.execute("SELECT COUNT(*) as count FROM crop_data").fetchone()["count"]
+    if cnt > 0:
+        return
+        
+    now = datetime.utcnow()
+    # Seed 7 days of crop data for two crops: field-1 (Tomato) and field-2 (Potato)
+    for i in range(7, 0, -1):
+        day = (now - timedelta(days=i)).isoformat()
+        
+        # Field 1: Tomato (healthy growth)
+        height_t = 15.0 + (7 - i) * 2.2
+        moisture_t = 55.4 + (i % 3) * 5.0
+        temp_t = 24.5 + (i % 2) * 2.0
+        db.execute(
+            "INSERT INTO crop_data (crop_id, timestamp, height_cm, soil_moisture, temperature_c) VALUES (?,?,?,?,?)",
+            ("field-1", day, height_t, moisture_t, temp_t)
+        )
+        
+        # Field 2: Potato
+        height_p = 10.0 + (7 - i) * 1.8
+        moisture_p = 48.0 - (i % 4) * 4.0
+        temp_p = 21.0 + (i % 3) * 1.5
+        db.execute(
+            "INSERT INTO crop_data (crop_id, timestamp, height_cm, soil_moisture, temperature_c) VALUES (?,?,?,?,?)",
+            ("field-2", day, height_p, moisture_p, temp_p)
+        )
+
+    # Seed some scan history
+    db.execute(
+        "INSERT INTO scan_history (timestamp, crop_detected, severity, ai_confidence, health_assessment, model_used) VALUES (?,?,?,?,?,?)",
+        ((now - timedelta(days=2)).isoformat(), "Tomato", "healthy", 99.0, "[Shennong 3.0 Diagnostic] Crop leaf 'Tomato' analyzed. Status: No disease detected. Pathology: Healthy plant tissue.", "Shennong-3.0 + Green-Shield")
+    )
+    db.execute(
+        "INSERT INTO scan_history (timestamp, crop_detected, severity, ai_confidence, health_assessment, model_used) VALUES (?,?,?,?,?,?)",
+        ((now - timedelta(days=1)).isoformat(), "Potato", "critical", 98.6, "[Shennong 3.0 Diagnostic] Crop leaf 'Potato' analyzed. Status: Potato Late Blight. Pathology: Phytophthora infestans.", "Shennong-3.0 + Green-Shield")
+    )
+
+    # Seed alerts
+    db.execute(
+        "INSERT INTO alerts (crop_id, type, message, timestamp) VALUES (?,?,?,?)",
+        ("field-1", "crop_healthy", "[Crop Scan] Tomato — HEALTHY | Confidence: 99%. Plant tissue is highly active.", (now - timedelta(days=2)).isoformat())
+    )
+    db.execute(
+        "INSERT INTO alerts (crop_id, type, message, timestamp) VALUES (?,?,?,?)",
+        ("field-2", "crop_critical", "[Crop Scan] Potato — CRITICAL | Confidence: 99%. Late Blight spots matched. Action required.", (now - timedelta(days=1)).isoformat())
+    )
+
+    # Seed a pump activation
+    db.execute(
+        "INSERT INTO water_pump_log (crop_id, timestamp, trigger_type, reason, moisture_before, duration_seconds, status) VALUES (?,?,?,?,?,?,?)",
+        ("field-2", (now - timedelta(hours=6)).isoformat(), "auto", "Soil moisture critically low at 28.0%", 28.0, 120, "stopped")
+    )
+    db.commit()
+
+
+@app.on_event("startup")
+def startup_event():
+    init_db()
+    db = get_db()
+    seed_mock_data(db)
+
+
+class SensorPayload(BaseModel):
+    crop_id: str
+    type: str
+    timestamp: Optional[str] = None
+    height_cm: Optional[float] = None
+    soil_moisture: Optional[float] = None
+    temperature_c: Optional[float] = None
+    motion: Optional[bool] = None
+
+
+@app.post("/sensor_data")
+async def ingest_sensor_data(payload: SensorPayload):
+    db = get_db()
+    ts = payload.timestamp or datetime.utcnow().isoformat()
+
+    if payload.type == "growth":
+        if payload.height_cm is None or payload.soil_moisture is None or payload.temperature_c is None:
+            raise HTTPException(status_code=400, detail="Missing fields for growth record")
+        
+        cur = db.execute(
+            "INSERT INTO crop_data (crop_id, timestamp, height_cm, soil_moisture, temperature_c) VALUES (?,?,?,?,?)",
+            (payload.crop_id, ts, payload.height_cm, payload.soil_moisture, payload.temperature_c)
+        )
+        record = CropData(
+            crop_id=payload.crop_id,
+            timestamp=datetime.fromisoformat(ts.replace("Z", "+00:00")) if "T" in ts else datetime.utcnow(),
+            height_cm=payload.height_cm,
+            soil_moisture=payload.soil_moisture,
+            temperature_c=payload.temperature_c,
+            id=cur.lastrowid
+        )
+        process_growth_reading(db, record)
+        db.commit()
+        return {"status": "growth data recorded", "id": cur.lastrowid}
+
+    if payload.type == "intrusion":
+        if payload.motion is None:
+            raise HTTPException(status_code=400, detail="Missing motion field for intrusion record")
+        
+        cur = db.execute(
+            "INSERT INTO intrusion_event (crop_id, timestamp, motion_detected) VALUES (?,?,?)",
+            (payload.crop_id, ts, 1 if payload.motion else 0)
+        )
+        event = IntrusionEvent(
+            crop_id=payload.crop_id,
+            timestamp=datetime.fromisoformat(ts.replace("Z", "+00:00")) if "T" in ts else datetime.utcnow(),
+            motion_detected=payload.motion,
+            id=cur.lastrowid
+        )
+        process_intrusion_reading(db, event)
+        db.commit()
+        return {"status": "intrusion data recorded", "id": cur.lastrowid}
+
+    raise HTTPException(status_code=400, detail="Unknown sensor type")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -114,7 +235,7 @@ async def mobile_send_push(payload: MobilePush):
 
 class CropImagePayload(BaseModel):
     image_base64: str
-    crop_hint: str | None = None
+    crop_hint: Optional[str] = None
 
 
 @app.post("/analyze_crop")
@@ -212,6 +333,7 @@ async def reports_overview():
     now = datetime.utcnow()
     week_ago = (now - timedelta(days=7)).isoformat()
 
+    # 1. Scans history
     all_scans = db.execute("SELECT * FROM scan_history ORDER BY timestamp DESC").fetchall()
     recent_scans = [s for s in all_scans if s["timestamp"] >= week_ago]
 
@@ -220,24 +342,74 @@ async def reports_overview():
     if recent_scans:
         avg_conf = sum(float(s["ai_confidence"]) for s in recent_scans) / len(recent_scans)
 
-    # Placeholder values for demonstration (replace with real calculations as needed)
-    health_score = 0
-    recent_alerts = []
-    total_alerts_all = 0
-    avg_temp = 0
-    avg_moisture = 0
-    min_temp = 0
-    max_temp = 0
-    min_moisture = 0
-    avg_height = 0
-    sensor_data = []
-    pump_count = 0
+    # 2. Sensor stats (CropData)
+    recent_data = db.execute("SELECT * FROM crop_data WHERE timestamp >= ? ORDER BY timestamp DESC", (week_ago,)).fetchall()
+    total_alerts_week = db.execute("SELECT COUNT(*) as count FROM alerts WHERE timestamp >= ?", (week_ago,)).fetchone()["count"]
+    total_alerts_all = db.execute("SELECT COUNT(*) as count FROM alerts").fetchone()["count"]
+    pump_activations = db.execute("SELECT COUNT(*) as count FROM water_pump_log WHERE timestamp >= ?", (week_ago,)).fetchone()["count"]
+
+    if recent_data:
+        avg_temp = round(sum(r["temperature_c"] for r in recent_data) / len(recent_data), 1)
+        avg_moisture = round(sum(r["soil_moisture"] for r in recent_data) / len(recent_data), 1)
+        avg_height = round(sum(r["height_cm"] for r in recent_data) / len(recent_data), 1)
+        min_moisture = round(min(r["soil_moisture"] for r in recent_data), 1)
+        max_temp = round(max(r["temperature_c"] for r in recent_data), 1)
+        min_temp = round(min(r["temperature_c"] for r in recent_data), 1)
+        crops = list(set(r["crop_id"] for r in recent_data))
+    else:
+        avg_temp = avg_moisture = avg_height = min_moisture = max_temp = min_temp = 0.0
+        crops = []
+
+    # 3. Alert breakdown
+    alerts_week = db.execute("SELECT type FROM alerts WHERE timestamp >= ?", (week_ago,)).fetchall()
     breakdown = {}
+    for a in alerts_week:
+        atype = a["type"]
+        breakdown[atype] = breakdown.get(atype, 0) + 1
+
+    # 4. Growth trend (last 7 days by day)
+    daily_data = {}
+    for r in recent_data:
+        day = r["timestamp"][:10]
+        if day not in daily_data:
+            daily_data[day] = {"heights": [], "moistures": [], "temps": []}
+        daily_data[day]["heights"].append(r["height_cm"])
+        daily_data[day]["moistures"].append(r["soil_moisture"])
+        daily_data[day]["temps"].append(r["temperature_c"])
+
     trends = []
+    for day in sorted(daily_data.keys()):
+        d = daily_data[day]
+        trends.append({
+            "date": day,
+            "avg_height": round(sum(d["heights"]) / len(d["heights"]), 1),
+            "avg_moisture": round(sum(d["moistures"]) / len(d["moistures"]), 1),
+            "avg_temp": round(sum(d["temps"]) / len(d["temps"]), 1),
+        })
+
+    # 5. Health score calculation
+    health_score = 85
+    if recent_data:
+        if avg_moisture < 30:
+            health_score -= 25
+        elif avg_moisture < 40:
+            health_score -= 10
+        if avg_temp > 38 or avg_temp < 10:
+            health_score -= 15
+    if total_alerts_week > 10:
+        health_score -= 20
+    elif total_alerts_week > 5:
+        health_score -= 10
+    health_score = max(0, min(100, health_score))
+
+    # Add scan crops to dynamic crops list
+    all_known_crops = list(set(crops + [s["crop_detected"] for s in all_scans]))
+    total_crops_count = len(all_known_crops)
 
     return {
         "health_score": health_score,
-        "total_crops": unique_crops,
+        "total_crops": total_crops_count,
+        "crops": all_known_crops,
         "total_scans": len(all_scans),
         "avg_confidence": round(avg_conf, 1),
         "recent_scans": [
@@ -252,7 +424,7 @@ async def reports_overview():
             for s in all_scans[:10]
         ],
         "week_summary": {
-            "alerts_count": len(recent_alerts),
+            "alerts_count": total_alerts_week,
             "alerts_total": total_alerts_all,
             "avg_temp": avg_temp,
             "avg_moisture": avg_moisture,
@@ -260,8 +432,8 @@ async def reports_overview():
             "max_temp": max_temp,
             "min_moisture": min_moisture,
             "avg_height": avg_height,
-            "readings_count": len(sensor_data),
-            "pump_activations": pump_count,
+            "readings_count": len(recent_data),
+            "pump_activations": pump_activations,
             "scan_count": len(recent_scans),
             "avg_confidence": round(avg_conf, 1),
         },
@@ -339,26 +511,26 @@ async def pump_logs():
 async def ai_status():
     import httpx
     try:
+        from app.china_agri_agent import ChinaAgriAgent
+        china_agent_active = True
+    except Exception:
+        china_agent_active = False
+
+    try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             r = await client.get("http://localhost:11434/api/tags")
             r.raise_for_status()
             models = [m["name"] for m in r.json().get("models", [])]
             has_vision = any(m for m in models if "llava" in m or "moondream" in m)
-            return {"ollama": True, "models": models, "vision_ready": has_vision}
+            return {"ollama": True, "models": models, "vision_ready": has_vision, "china_agent": china_agent_active}
     except Exception:
-        return {"ollama": False, "models": [], "vision_ready": False}
+        return {"ollama": False, "models": [], "vision_ready": False, "china_agent": china_agent_active}
 
 
 # Serve static files and index.html from FastAPI
 from pathlib import Path
-WEB_DIR = Path(__file__).parent.parent / "web"
 
-# Mount static files at root and serve index.html for '/'
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="static")
 
 # Optionally, remove or comment out the old '/' route and '/static' mount if present
 
 # All static files and index.html are now served at root by FastAPI (see mount above).
-

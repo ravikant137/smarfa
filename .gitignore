@@ -13,3 +13,11 @@ mobile-app/node_modules/
 smartfarm-ai/dataset/
 smartfarm-ai/model/*.h5
 smartfarm-ai/model/*.tflite
+
+# Additional security/creds
+.env*
+**/.env*
+*.pem
+*.key
+certs/
+secrets/
