@@ -33,8 +33,8 @@ button{font-family:inherit}
 .nav { display:flex; flex-direction:row; justify-content:space-between; align-items:center; padding: 16px 48px; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
 .nav-logo { display:flex; align-items:center; gap: 12px; font-size: 24px; font-weight: 900; color: var(--blue); letter-spacing: -0.5px; }
 .nav-logo span { color: var(--green); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; font-weight: 800; }
-.nav-links { display:flex; gap: 32px; }
-.nav-links button { background: none; border: none; font-size: 15px; font-weight: 700; color: var(--muted); cursor: pointer; transition: 0.2s; position: relative; padding: 8px 0; }
+.nav-links { display:flex; align-items:center; gap: 32px; }
+.nav-links button { display:flex; align-items:center; justify-content:center; gap:6px; background: none; border: none; font-size: 15px; font-weight: 700; color: var(--muted); cursor: pointer; transition: 0.2s; position: relative; padding: 8px 0; }
 .nav-links button:hover { color: var(--green-d); }
 .nav-links button.active { color: var(--green-d); }
 .nav-links button.active::after { content:''; position:absolute; bottom:0; left:0; width:100%; height:3px; background:var(--green-d); border-radius: 4px; }
@@ -236,6 +236,7 @@ button{font-family:inherit}
       <button onclick="switchTab('alerts')" data-tab="alerts" id="btn-alerts">Alerts</button>
       <button onclick="switchTab('lifecycle')" data-tab="lifecycle" id="btn-lifecycle">🌱 Crop Cycle</button>
       <button onclick="switchTab('history')" data-tab="history" id="btn-history">History & ML</button>
+      <button onclick="switchTab('marketplace')" data-tab="marketplace" id="btn-marketplace">🛒 Market</button>
       <button onclick="switchTab('profile')" data-tab="profile" id="btn-profile">Account</button>
     </div>
     <div class="nav-cta" style="display:flex; align-items:center; gap:12px;">
@@ -541,7 +542,58 @@ button{font-family:inherit}
         <!-- Timeline populated dynamically -->
       </div>
     </div>
+    <!-- ── Tab: Marketplace ─────────── -->
+    <div class="tab" id="tab-marketplace">
+      <div style="background:linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);border-radius:20px;padding:32px;margin-bottom:24px;text-align:center;color:#fff;position:relative;overflow:hidden;box-shadow:0 12px 30px rgba(59,130,246,0.3);">
+        <div style="font-size:48px;margin-bottom:12px;">🛒</div>
+        <h2 style="font-size:28px;font-weight:900;margin-bottom:8px;">Treatment Marketplace</h2>
+        <p style="color:rgba(255,255,255,0.8);font-size:16px;max-width:600px;margin:0 auto;">Purchase AI-recommended treatments, fertilizers, and supplies directly from local verified agricultural stores based on your recent scans.</p>
+      </div>
 
+      <!-- Content wrapper -->
+      <div id="marketplace-loading" style="text-align:center;padding:40px;display:none;">
+        <div class="spinner"></div>
+        <div style="margin-top:16px;color:var(--muted);font-weight:600;">Searching local stores for required treatments...</div>
+      </div>
+      
+      <div id="marketplace-content" style="display:none;">
+        <div style="margin-bottom:32px;">
+          <h3 style="font-size:18px;font-weight:800;margin-bottom:16px;color:var(--text);display:flex;align-items:center;gap:8px;">
+            <span style="background:rgba(239,68,68,0.1);color:var(--red);padding:6px 10px;border-radius:8px;font-size:14px;">AI Recommendation</span> 
+            Required for: <span id="market-disease-name" style="text-decoration:underline;text-decoration-style:dashed;"></span>
+          </h3>
+          
+          <div id="market-treatment-card" style="background:#fff;border-radius:16px;padding:24px;border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,0.06);display:flex;gap:24px;align-items:flex-start;">
+            <div style="width:120px;height:120px;background:#f8fafc;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:48px;border:1px solid #e2e8f0;">💊</div>
+            <div style="flex:1;">
+              <div style="font-size:12px;color:var(--green);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Recommended Product</div>
+              <div id="market-product-name" style="font-size:22px;font-weight:900;color:var(--text);margin-bottom:8px;">Copper Fungicide</div>
+              <p id="market-product-desc" style="font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:16px;">Effective against blights, leaf spots, and mildews. Apply as a foliar spray every 7-10 days.</p>
+              <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,0.1);color:var(--green-d);padding:6px 12px;border-radius:50px;font-size:13px;font-weight:700;">
+                <span style="font-size:16px;">✓</span> Verified AI Match
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:24px;">
+          <h3 style="font-size:18px;font-weight:800;margin-bottom:16px;color:var(--text);display:flex;justify-content:space-between;align-items:center;">
+            Nearby Sellers in Stock
+            <span style="font-size:13px;color:var(--muted);font-weight:600;" id="market-local-city">📍 Searching...</span>
+          </h3>
+          <div id="market-stores-list" style="display:flex;flex-direction:column;gap:12px;">
+            <!-- Generated dynamically -->
+          </div>
+        </div>
+      </div>
+      
+      <div id="marketplace-empty" style="text-align:center;padding:60px 20px;display:block;">
+        <div style="font-size:64px;margin-bottom:16px;">🪴</div>
+        <h3 style="font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px;">Your Farm is Healthy!</h3>
+        <p style="color:var(--muted);font-size:14px;max-width:400px;margin:0 auto 24px;">We didn't detect any critical diseases in your recent scans that require immediate treatment purchases.</p>
+        <button onclick="switchTab('alerts')" class="btn" style="background:rgba(239,68,68,0.1);color:var(--red);border:none;padding:10px 24px;border-radius:50px;font-weight:700;cursor:pointer;">Review Active Alerts</button>
+      </div>
+    </div>
     <!-- ── Tab: Profile ────────────── -->
     <div class="tab" id="tab-profile">
 
@@ -877,6 +929,7 @@ function switchTab(tab) {
   if (tab === 'lifecycle') { if (!_lifecycleInited) { renderCropSelectorGrid(); _lifecycleInited = true; } renderFieldStatusStrip(); renderRegionalCrops(); }
   if (tab === 'dashboard') { loadDashboardData(); renderDashRecentScans(); fetchMarketPrices(); }
   if (tab === 'history') { loadHistoryData(); }
+  if (tab === 'marketplace') { loadMarketplace(); }
 }
 
 function loadHistoryData() {
@@ -1523,6 +1576,89 @@ async function loadReports() {
     document.getElementById('reports-history-list').innerHTML = html;
   }, 500); // fake loading delay for UI polish
 }
+// ── Marketplace ─────────────────────────────
+async function loadMarketplace() {
+  var loading = document.getElementById('marketplace-loading');
+  var content = document.getElementById('marketplace-content');
+  var empty = document.getElementById('marketplace-empty');
+  
+  loading.style.display = 'block';
+  content.style.display = 'none';
+  empty.style.display = 'none';
+
+  setTimeout(function() {
+    var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+    if (history.length === 0) {
+      loading.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
+
+    var lastScan = history[history.length - 1];
+    if (lastScan.severity === 'healthy') {
+      loading.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
+
+    // Determine treatment STRICTLY from AI LLM output
+    var treatmentName = "AI Recommended Treatment";
+    var treatmentDesc = lastScan.treatment_recommendation || "Consult local agricultural experts.";
+    var treatmentIcon = "💊";
+
+    var diagText = ((lastScan.structured && lastScan.structured.disease_name) || lastScan.health_assessment || "").toLowerCase();
+
+    // Prefer exact chemical/organic treatment from structured AI output
+    if (lastScan.structured && lastScan.structured.treatment) {
+      if (lastScan.structured.treatment.chemical && lastScan.structured.treatment.chemical.toLowerCase() !== 'none' && lastScan.structured.treatment.chemical.toLowerCase() !== 'n/a') {
+        treatmentName = lastScan.structured.treatment.chemical.split('.')[0] || "Chemical Treatment";
+        treatmentDesc = (lastScan.structured.treatment.dosage || "Follow package instructions carefully.") + " (AI Recommended Chemical)";
+        treatmentIcon = "🧪";
+      } else if (lastScan.structured.treatment.organic && lastScan.structured.treatment.organic.toLowerCase() !== 'none' && lastScan.structured.treatment.organic.toLowerCase() !== 'n/a') {
+        treatmentName = lastScan.structured.treatment.organic.split('.')[0] || "Organic Treatment";
+        treatmentDesc = (lastScan.structured.treatment.dosage || "Apply as directed.") + " (AI Recommended Organic)";
+        treatmentIcon = "🌿";
+      }
+    } else if (lastScan.treatment_recommendation) {
+        treatmentName = lastScan.treatment_recommendation.split('.')[0] || "AI Treatment";
+    }
+
+    document.getElementById('market-disease-name').textContent = (lastScan.structured && lastScan.structured.disease_name) ? lastScan.structured.disease_name : "Crop Anomaly";
+    document.getElementById('market-product-name').textContent = treatmentName;
+    document.getElementById('market-product-desc').textContent = treatmentDesc;
+    document.getElementById('market-treatment-card').children[0].textContent = treatmentIcon;
+
+    // Simulate Nearby Stores
+    var stores = [
+      { name: "Kisan Agro Hub", dist: "1.2 km", stock: "In Stock", price: "₹250", color: "var(--green)" },
+      { name: "Green Field Fertilizers", dist: "3.4 km", stock: "Low Stock", price: "₹280", color: "var(--yellow)" },
+      { name: "Ravi Krushi Kendra", dist: "5.1 km", stock: "In Stock", price: "₹240", color: "var(--green)" }
+    ];
+
+    var storesHtml = '';
+    stores.forEach(function(s) {
+      storesHtml += '<div style="background:#f8fafc;border:1px solid #e2e8f0;padding:16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;">' +
+        '<div>' +
+          '<div style="font-weight:800;font-size:15px;color:var(--text);">' + s.name + '</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:2px;">📍 ' + s.dist + ' away</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+          '<div style="font-weight:900;font-size:16px;color:var(--text);">' + s.price + '</div>' +
+          '<div style="font-size:11px;font-weight:700;color:' + s.color + ';margin-top:2px;">' + s.stock + '</div>' +
+        '</div>' +
+      '</div>';
+    });
+    
+    document.getElementById('market-stores-list').innerHTML = storesHtml;
+    
+    var mCity = document.getElementById('market-location') ? document.getElementById('market-location').textContent : "Nearby";
+    document.getElementById('market-local-city').textContent = "📍 " + mCity;
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  }, 600);
+}
+
 
 function hideAlertDetails() {
   var modal = document.getElementById('alert-details-modal');
