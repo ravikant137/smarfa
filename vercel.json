@@ -1,10 +1,7 @@
 {
-  "framework": "create-react-app",
-  "installCommand": "npm install && cd mobile-app && npm install",
-  "buildCommand": "cd mobile-app && npx expo export -p web",
-  "outputDirectory": "mobile-app/dist",
+  "buildCommand": "echo 'No build needed for static web app'",
+  "outputDirectory": "web",
   "rewrites": [
-    { "source": "/api/v1/:path*", "destination": "/api/v1/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/v1/:path*", "destination": "/api/v1/:path*" }
   ]
 }
