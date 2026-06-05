@@ -21,7 +21,7 @@ export default function ReportsScreen() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.get(`${getApiBaseUrl()}/reports/overview`, { timeout: 15000 });
+      const res = await axios.get(`${getApiBaseUrl()}/api/reports/overview`, { timeout: 15000 });
       setReport(res.data);
     } catch (err) {
       setError('Could not load reports. Make sure the server is running.');

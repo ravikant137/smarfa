@@ -15,8 +15,8 @@ export default function AlertsScreen() {
     setLoading(true);
     try {
       const [alertsRes, scansRes] = await Promise.all([
-        axios.get(`${getApiBaseUrl()}/alerts`).catch(() => ({ data: [] })),
-        axios.get(`${getApiBaseUrl()}/scan_history?limit=20`).catch(() => ({ data: [] })),
+        axios.get(`${getApiBaseUrl()}/api/alerts`).catch(() => ({ data: [] })),
+        axios.get(`${getApiBaseUrl()}/api/scan_history?limit=20`).catch(() => ({ data: [] })),
       ]);
 
       const systemAlerts = (alertsRes.data || []).map((a) => ({
