@@ -1,7 +1,7 @@
 {
   "framework": "create-react-app",
   "installCommand": "cd mobile-app && npm install",
-  "buildCommand": "cd mobile-app && npx expo export -p web",
+  "buildCommand": "EXPO_PUBLIC_SUPABASE_URL=$SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY cd mobile-app && npx expo export -p web",
   "outputDirectory": "mobile-app/dist",
   "rewrites": [
     { "source": "/login", "destination": "/api/login" },
