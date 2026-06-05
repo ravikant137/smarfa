@@ -2922,10 +2922,19 @@
         + '<div style="font-size:20px;font-weight:900;color:#3d7a3a;">' + cropScans.length + '</div>'
         + '<div style="font-size:11px;color:#7a6a52;">AI Scans Logged</div>'
         + '</div></div>'
-      // Generate mock market price for this crop
-      var basePrice = crop === 'Mango' ? 8000 : (crop.includes('Dal') || crop.includes('Pea') ? 6500 : 2500);
-      var rand = Math.floor(Math.random() * 500) - 200;
-      var currentPrice = '₹' + (basePrice + rand) + ' / quintal';
+      // Generate realistic mock market price for this crop
+      var priceMap = {
+        'Mango': 8000, 'Wheat': 2275, 'Rice': 2183, 'Tomato': 1500, 'Corn': 2090,
+        'Apple': 7000, 'Grape': 6000, 'Potato': 1200, 'Citrus': 4000, 'Sunflower': 4500,
+        'Pepper': 5000, 'Banana': 1800, 'Sugarcane': 315, /* per quintal */ 'Cotton': 7200,
+        'Onion': 2000, 'Marigold': 4000, 'Pigeon Pea': 7000, 'Moong Dal': 8500,
+        'Black Gram': 8000, 'Soybean': 4600, 'Jowar': 3180, 'Groundnut': 6377,
+        'Harbhara': 5335, 'Bajra': 2500, 'Turmeric': 12000, 'Pomegranate': 8500,
+        'Mustard': 5450, 'Indrayani Rice': 3500, 'Basmati Rice': 4500, 'Sona Masuri Rice': 3000
+      };
+      var basePrice = priceMap[crop] || (crop.includes('Dal') || crop.includes('Pea') ? 6500 : 2500);
+      var rand = Math.floor(Math.random() * (basePrice * 0.1)) - (basePrice * 0.05); // +/- 5% variation
+      var currentPrice = '₹' + Math.round(basePrice + rand) + ' / quintal';
       var trendIcon = rand >= 0 ? '▲' : '▼';
       var trendColor = rand >= 0 ? 'var(--green)' : 'var(--red)';
 
