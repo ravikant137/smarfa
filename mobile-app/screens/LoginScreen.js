@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedButton from '../components/AnimatedButton';
 import GradientHeader from '../components/GradientHeader';
 import { getApiBaseUrl } from '../utils/api';
-import { supabase } from '../utils/supabase';
 import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
@@ -22,19 +21,20 @@ export default function LoginScreen({ navigation }) {
     setError('');
     setLoading(true);
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+      const response = await axios.post(`${getApiBaseUrl()}/login`, {
+        username: email.trim(),
+        password
       });
       setLoading(false);
-      if (authError) throw authError;
       
-      if (data.user) {
-        navigation.navigate('Home', { username: email.trim(), userId: data.user.id });
+      if (response.data?.status === 'login successful') {
+        navigation.navigate('Home', { username: email.trim(), userId: response.data.user_id });
+      } else {
+        setError('Login failed. Check credentials and try again.');
       }
     } catch (err) {
       setLoading(false);
-      setError(err.message || 'Login failed. Check credentials and try again.');
+      setError(err.response?.data?.detail || err.message || 'Login failed. Check credentials and try again.');
     }
   };
 

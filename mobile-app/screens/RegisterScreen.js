@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedButton from '../components/AnimatedButton';
 import GradientHeader from '../components/GradientHeader';
 import { getApiBaseUrl } from '../utils/api';
-import { supabase } from '../utils/supabase';
 import axios from 'axios';
 
 export default function RegisterScreen({ navigation }) {
@@ -26,25 +25,19 @@ export default function RegisterScreen({ navigation }) {
 
     setLoading(true);
     try {
-      const { data, error: authError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
+      const response = await axios.post(`${getApiBaseUrl()}/register`, {
+        username: email.trim().toLowerCase(),
         password,
-        options: {
-          data: {
-            full_name: name,
-          }
-        }
+        name
       });
-
-      if (authError) throw authError;
-
-      if (data.user) {
-        navigation.navigate('Home', { username: email.trim().toLowerCase(), userId: data.user.id });
+      
+      if (response.data?.status === 'user registered') {
+        navigation.navigate('Home', { username: email.trim().toLowerCase(), userId: response.data.id });
       } else {
         setError('Registration failed. Please try again.');
       }
     } catch (err) {
-      setError(err.message || 'Registration failed. Please try again.');
+      setError(err.response?.data?.detail || err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
