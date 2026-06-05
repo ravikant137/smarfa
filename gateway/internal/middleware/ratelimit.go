@@ -9,7 +9,7 @@ import (
 
 func RateLimiter() fiber.Handler {
 	return limiter.New(limiter.Config{
-		Max:        20,
+		Max:        300,
 		Expiration: 1 * time.Minute,
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return c.IP()

@@ -2198,51 +2198,79 @@
           return;
         }
 
-        // Determine treatment STRICTLY from AI LLM output
-        var treatmentName = "AI Recommended Treatment";
-        var treatmentDesc = lastScan.treatment_recommendation || "Consult local agricultural experts.";
-        var treatmentIcon = "💊";
-
-        var diagText = ((lastScan.structured && lastScan.structured.disease_name) || lastScan.health_assessment || "").toLowerCase();
-
-        // Prefer exact chemical/organic treatment from structured AI output
-        if (lastScan.structured && lastScan.structured.treatment) {
-          if (lastScan.structured.treatment.chemical && lastScan.structured.treatment.chemical.toLowerCase() !== 'none' && lastScan.structured.treatment.chemical.toLowerCase() !== 'n/a') {
-            treatmentName = lastScan.structured.treatment.chemical.split('.')[0] || "Chemical Treatment";
-            treatmentDesc = (lastScan.structured.treatment.dosage || "Follow package instructions carefully.") + " (AI Recommended Chemical)";
-            treatmentIcon = "🧪";
-          } else if (lastScan.structured.treatment.organic && lastScan.structured.treatment.organic.toLowerCase() !== 'none' && lastScan.structured.treatment.organic.toLowerCase() !== 'n/a') {
-            treatmentName = lastScan.structured.treatment.organic.split('.')[0] || "Organic Treatment";
-            treatmentDesc = (lastScan.structured.treatment.dosage || "Apply as directed.") + " (AI Recommended Organic)";
-            treatmentIcon = "🌿";
+        // ── Sanitize ingredient name — strips "Apply X at 0.6g..." → "X" ──
+        function extractIngredient(text) {
+          if (!text) return '';
+          // If AI returned a proper product block active_ingredient, trust it
+          // Strip leading verb words
+          var cleaned = text.trim().replace(/^(apply|use|spray|mix|dissolve|dilute|administer|treat with|apply)\s+/i, '');
+          // Take only the first 1-3 words before any number or preposition
+          var words = cleaned.split(/\s+/);
+          var result = [];
+          var stopWords = ['at','in','per','with','of','to','on','for','a','an','the','and','or'];
+          for (var i = 0; i < Math.min(words.length, 4); i++) {
+            if (/\d/.test(words[i])) break; // stop at any number
+            if (stopWords.indexOf(words[i].toLowerCase()) !== -1 && i > 0) break;
+            result.push(words[i]);
           }
-        } else if (lastScan.treatment_recommendation) {
-          treatmentName = lastScan.treatment_recommendation.split('.')[0] || "AI Treatment";
+          return result.join(' ').replace(/[.,;:]+$/, '').trim() || text.split(' ').slice(0,2).join(' ');
         }
 
-        document.getElementById('market-disease-name').textContent = (lastScan.structured && lastScan.structured.disease_name) ? lastScan.structured.disease_name : "Crop Anomaly";
-        document.getElementById('market-product-name').textContent = treatmentName;
-        document.getElementById('market-product-desc').textContent = treatmentDesc;
-        document.getElementById('market-treatment-card').children[0].textContent = treatmentIcon;
+        // ── PRIMARY: Use AI-returned product data directly ──
+        var treatmentType = 'chemical';
+        var rawChemical = (lastScan.structured && lastScan.structured.treatment && lastScan.structured.treatment.chemical && lastScan.structured.treatment.chemical.toLowerCase() !== 'none' && lastScan.structured.treatment.chemical.toLowerCase() !== 'n/a') ? lastScan.structured.treatment.chemical : '';
+        var rawOrganic = (lastScan.structured && lastScan.structured.treatment && lastScan.structured.treatment.organic) ? lastScan.structured.treatment.organic : '';
+        if (!rawChemical && rawOrganic) treatmentType = 'organic';
+        var treatmentName = extractIngredient(rawChemical || rawOrganic || lastScan.treatment_recommendation || 'AI Treatment');
+        var aiProduct = lastScan.structured && lastScan.structured.product;
+        var activeIngredient = extractIngredient((aiProduct && aiProduct.active_ingredient) || '');
+        var displayProductName = (aiProduct && aiProduct.commercial_name) || activeIngredient || treatmentName;
+        var aiImgUrl = '';
 
-        // Simulate Nearby Stores
+        // ── Purely LLM-driven: no hardcoded catalog ──
+        var finalDisplayName = (aiProduct && aiProduct.commercial_name) || activeIngredient || treatmentName || 'AI Treatment';
+        var brandSubtitle = activeIngredient && activeIngredient.toLowerCase() !== finalDisplayName.toLowerCase() ? activeIngredient : '';
+
+        // Dynamic image: construct Wikimedia Commons URL from ingredient name
+        var wikiSlug = (activeIngredient || treatmentName || '').trim().replace(/\s+/g, '_');
+        var productImgUrl = wikiSlug ? 'https://en.wikipedia.org/wiki/Special:FilePath/' + encodeURIComponent(wikiSlug) + '.svg' : '';
+        var genericFallback = 'https://images.unsplash.com/photo-1585566369773-da34a6e6e67a?w=200&h=200&fit=crop&q=80';
+
+        document.getElementById('market-disease-name').textContent = (lastScan.structured && lastScan.structured.disease_name) ? lastScan.structured.disease_name : "Crop Anomaly";
+        document.getElementById('market-product-name').textContent = finalDisplayName;
+        document.getElementById('market-product-desc').textContent = (brandSubtitle ? brandSubtitle + ' · ' : '') + (lastScan.structured && lastScan.structured.treatment && lastScan.structured.treatment.dosage ? lastScan.structured.treatment.dosage + ' · ' : '') + (treatmentType === 'organic' ? 'Organic' : 'Chemical') + ' Treatment';
+        var imgContainer = document.getElementById('market-treatment-card').children[0];
+        imgContainer.innerHTML = '<img src="' + (productImgUrl || genericFallback) + '" alt="' + finalDisplayName + '" onerror="this.src=\'' + genericFallback + '\'" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:8px;background:#f8fafc;">';
+        imgContainer.style.overflow = 'hidden';
+        imgContainer.style.padding = '0';
+
+        // ── Nearby Stores (Local) ──
         var stores = [
           { name: "Kisan Agro Hub", dist: "1.2 km", stock: "In Stock", price: "₹250", color: "var(--green)" },
           { name: "Green Field Fertilizers", dist: "3.4 km", stock: "Low Stock", price: "₹280", color: "var(--yellow)" },
           { name: "Ravi Krushi Kendra", dist: "5.1 km", stock: "In Stock", price: "₹240", color: "var(--green)" }
         ];
 
+        var alternatives = (aiProduct && aiProduct.alternatives) || [];
+        var brandsList = [finalDisplayName];
+        if (alternatives && alternatives.length) {
+            brandsList = brandsList.concat(alternatives);
+        }
+
         var storesHtml = '';
-        stores.forEach(function (s) {
+        stores.forEach(function (s, idx) {
+          var storeBrand = brandsList[idx % brandsList.length];
           var isOutOfStock = s.stock.includes('Out') || s.stock.includes('Low');
+          var mapQuery = encodeURIComponent(s.name + ' agricultural store near me');
           var buyBtn = isOutOfStock ?
             '<button disabled style="background:#e2e8f0;color:#94a3b8;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:not-allowed;">Unavailable</button>' :
-            '<button onclick="openCheckout(&apos;' + s.name + '&apos;, &apos;' + s.price + '&apos;, &apos;' + treatmentName + '&apos;)" style="background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(61,122,58,0.2);">Buy Now</button>';
+            '<button onclick="openCheckout(&apos;' + s.name + '&apos;, &apos;' + s.price + '&apos;, &apos;' + storeBrand + '&apos;)" style="background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(61,122,58,0.2);">Buy Locally</button>';
 
           storesHtml += '<div style="background:#f8fafc;border:1px solid #e2e8f0;padding:16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">' +
             '<div style="flex:1;min-width:150px;">' +
             '<div style="font-weight:800;font-size:15px;color:var(--text);">' + s.name + '</div>' +
-            '<div style="font-size:12px;color:var(--muted);margin-top:2px;">📍 ' + s.dist + ' away</div>' +
+            '<div style="font-size:12px;color:var(--muted);margin-top:2px;">📍 ' + s.dist + ' away • <a href="https://www.google.com/maps/search/?api=1&query=' + mapQuery + '" target="_blank" style="color:var(--green);text-decoration:none;">View on Map</a></div>' +
+            '<div style="font-size:12px;color:var(--text);font-weight:600;margin-top:4px;">Offers: ' + storeBrand + '</div>' +
             '</div>' +
             '<div style="text-align:right;margin-right:12px;">' +
             '<div style="font-weight:900;font-size:16px;color:var(--text);">' + s.price + '</div>' +

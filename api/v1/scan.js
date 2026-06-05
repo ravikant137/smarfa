@@ -18,44 +18,49 @@ CRITICAL INSTRUCTIONS:
 5. If the image shows a fruit plant, provide fruit-specific disease, ripening, and harvest advice.
 6. If you are unsure of the species, state the most probable genus. Only use 'Unknown Plant' as a last resort.
 
-Return ONLY a valid JSON object matching this EXACT structure:
+Return ONLY a valid JSON object. Fill each field based on the actual image — do NOT copy the example values literally:
 {
-  "crop_detected": "Common Name (Scientific Name) — e.g. Rose (Rosa indica) or Papaya (Carica papaya)",
-  "plant_type": "crop", "fruit", "flower", or "ornamental",
-  "severity": "healthy", "warning", or "critical",
-  "ai_confidence": 95.5,
-  "health_assessment": "High-level summary of the plant's health and appearance.",
+  "crop_detected": "Common Name (Scientific Name)",
+  "plant_type": "one of: crop | fruit | flower | ornamental | herb | vegetable",
+  "severity": "one of: healthy | warning | critical",
+  "ai_confidence": 0.0,
+  "health_assessment": "2-sentence summary of overall health.",
   "structured": {
-    "confidence_warning": "Include ONLY if image is blurry or hard to identify, else omit.",
-    "final_crop": "Common Plant Name",
+    "final_crop": "Common plant name only",
     "plant_category": "Crop / Fruit / Flower / Ornamental / Herb / Vegetable",
     "disease": {
-      "name": "Disease Name or 'No disease detected'",
+      "name": "Disease name or 'No disease detected'",
       "confidence": "High / Medium / Low",
-      "cause": "Fungal, Bacterial, Viral, Pest, Nutrient Deficiency, or Physiological",
-      "severity": "Low, Medium, High, or Critical"
+      "cause": "Fungal / Bacterial / Viral / Pest / Nutrient Deficiency / Physiological",
+      "severity": "Low / Medium / High / Critical"
     },
     "safety_check": {
       "verified": true,
-      "chemical": "Name of recommended active ingredient",
+      "chemical": "Active ingredient name only",
       "safety_class": "Organic / Synthetic / Restricted",
-      "eco_status": "Safe for bees / Toxic to fish / etc.",
-      "compliance_details": "Local regulatory notes or pre-harvest intervals."
+      "eco_status": "e.g. Safe for bees",
+      "compliance_details": "Pre-harvest interval or local notes."
     },
     "treatment": {
-      "organic": "Step-by-step organic/natural treatment.",
-      "chemical": "Targeted chemical treatment if necessary.",
-      "dosage": "Exact mixing ratios (e.g. 2ml per Liter of water).",
-      "prevention": "Cultural practices to stop recurrence.",
-      "irrigation_adjustment": "Should water be increased or decreased?",
-      "soil_correction": "Fertilizer or pH changes needed.",
-      "flower_care": "For flower plants: pruning, deadheading, bloom boosting tips.",
-      "fruit_care": "For fruit plants: thinning, ripening, post-harvest tips."
+      "organic": "Organic treatment steps.",
+      "chemical": "ONLY THE INGREDIENT NAME — 1 to 3 words max, e.g. Tricyclazole or Copper Oxychloride or Neem Oil. NO sentences. NO dosage here.",
+      "dosage": "Mixing ratio only, e.g. 0.6g per Liter of water.",
+      "prevention": "Cultural prevention steps.",
+      "irrigation_adjustment": "Increase / Decrease / Maintain.",
+      "soil_correction": "Fertilizer or pH fix needed.",
+      "flower_care": "Pruning or bloom tips if flower plant.",
+      "fruit_care": "Ripening or harvest tips if fruit plant."
+    },
+    "product": {
+      "commercial_name": "Most common Indian brand name for this treatment, e.g. Beam 75 WP or Dithane M-45",
+      "active_ingredient": "Pure ingredient keyword only, e.g. Tricyclazole",
+      "amazon_search_term": "Exact search term to find this product on Amazon India",
+      "alternatives": ["Alternative Indian Brand 1", "Alternative Indian Brand 2"]
     },
     "agent_logs": {
-      "pathology_agent": "Detailed visual symptoms observed (lesions, chlorosis, wilting, spots, etc).",
-      "agronomy_agent": "Environmental factors likely contributing to this condition.",
-      "safety_agent": "Safety precautions for the farmer or gardener."
+      "pathology_agent": "Visual symptoms observed.",
+      "agronomy_agent": "Environmental factors.",
+      "safety_agent": "Safety precautions."
     }
   }
 }`;
