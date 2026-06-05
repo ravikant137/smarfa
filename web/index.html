@@ -2512,6 +2512,45 @@
         { name: 'Harvest & Ratoon Management', icon: '🌾', days: 'Month 10', color: '#c0392b', water: 'Reduce before harvest', fertilizer: 'None', pest: 'Banana Weevil in ratoon', disease: 'Post-harvest Crown Rot', tip: 'Harvest when fingers are round (3/4 full). Cut bunch and handle carefully — bruising causes black skin.' }
       ]
     };
+    CROP_DATA['Sugarcane'] = {
+      icon: '🎋', days: 365, soil: 'Deep Rich Loam / Clayey Loam', water: 'High', sunlight: 'Full Sun', yield: '40–50 tons/acre',
+      stages: [
+        { name: 'Planting / Sett Treatment', icon: '🪛', days: 'Month 1', color: '#8B5E3C', water: 'Irrigate immediately after planting', fertilizer: 'Basal dose: NPK + FYM', pest: 'Termites, Early Shoot Borer', disease: 'Red Rot, Smut', tip: 'Use healthy two-bud setts treated with fungicide before planting.' },
+        { name: 'Germination & Tillering', icon: '🌱', days: 'Month 2–4', color: '#6ab04c', water: 'Every 8–10 days', fertilizer: 'Urea top dressing', pest: 'Top Borer, Mealybug', disease: 'Grassy Shoot Disease', tip: 'Earthing up helps prevent lodging and controls weeds.' },
+        { name: 'Grand Growth', icon: '🌿', days: 'Month 5–9', color: '#3d7a3a', water: 'High demand - every 7 days', fertilizer: 'Potassium application', pest: 'Internode Borer, Whitefly', disease: 'Pokkah Boeng, Red Rot', tip: 'Wrap and tie (propping) the canes to prevent lodging during heavy winds.' },
+        { name: 'Maturity & Ripening', icon: '🎋', days: 'Month 10–12', color: '#e8a838', water: 'Reduce watering significantly', fertilizer: 'None', pest: 'Rats, Scale Insects', disease: 'Pineapple Disease (post-harvest)', tip: 'Stop irrigation 15 days prior to harvest to improve sucrose recovery.' }
+      ]
+    };
+
+    CROP_DATA['Cotton'] = {
+      icon: '☁️', days: 150, soil: 'Black Cotton Soil / Clay Loam', water: 'Moderate', sunlight: 'Full Sun', yield: '8–12 quintals/acre',
+      stages: [
+        { name: 'Sowing & Germination', icon: '🪛', days: 'Day 1–15', color: '#8B5E3C', water: 'Pre-sowing irrigation', fertilizer: 'Basal DAP + Potash', pest: 'Termites', disease: 'Seedling Blight', tip: 'Sow on ridges to avoid waterlogging. Thinning to one plant per hill is crucial.' },
+        { name: 'Vegetative Growth', icon: '🌿', days: 'Day 16–60', color: '#3d7a3a', water: 'Irrigate only if dry', fertilizer: 'Nitrogen top dressing', pest: 'Jassids, Aphids, Thrips', disease: 'Bacterial Blight', tip: 'Nipping of apical bud at 60 days encourages lateral branching.' },
+        { name: 'Squaring & Flowering', icon: '🌸', days: 'Day 61–100', color: '#d4952a', water: 'Critical: avoid water stress', fertilizer: 'Boron + Magnesium spray', pest: 'Pink Bollworm, Whitefly', disease: 'Alternaria Leaf Spot', tip: 'Install pheromone traps for Pink Bollworm. Do not over-irrigate as it causes shedding.' },
+        { name: 'Boll Formation & Bursting', icon: '☁️', days: 'Day 101–150', color: '#e8a838', water: 'Reduce water', fertilizer: 'Potassium foliar spray', pest: 'Bollworms', disease: 'Boll Rot', tip: 'Harvest when bolls are fully burst and dry. Avoid morning dew during picking.' }
+      ]
+    };
+
+    CROP_DATA['Onion'] = {
+      icon: '🧅', days: 110, soil: 'Sandy Loam / Friable', water: 'Moderate', sunlight: 'Full Sun', yield: '10–12 tons/acre',
+      stages: [
+        { name: 'Nursery & Transplanting', icon: '🪛', days: 'Day 1–45', color: '#8B5E3C', water: 'Light frequent watering', fertilizer: 'Compost in nursery', pest: 'Thrips', disease: 'Damping Off', tip: 'Transplant 6-8 week old seedlings at 15x10 cm spacing. Dip roots in Trichoderma.' },
+        { name: 'Vegetative Growth', icon: '🌿', days: 'Day 46–70', color: '#3d7a3a', water: 'Irrigate every 10 days', fertilizer: 'Urea + Sulphur', pest: 'Thrips (Major pest)', disease: 'Purple Blotch', tip: 'Sulphur application is essential for pungency and storage quality.' },
+        { name: 'Bulb Formation', icon: '🧅', days: 'Day 71–95', color: '#e8a838', water: 'Critical: consistent moisture', fertilizer: 'Potassium sulphate', pest: 'Onion Maggot', disease: 'Stemphylium Blight', tip: 'Do not deep cultivate as onions are shallow rooted. Keep weed free.' },
+        { name: 'Maturity & Harvesting', icon: '🌾', days: 'Day 96–110', color: '#c0392b', water: 'Stop watering 15 days prior', fertilizer: 'None', pest: 'Storage pests', disease: 'Neck Rot, Basal Rot', tip: 'Harvest when 50% of the tops fall over. Cure in shade for 7-10 days before storage.' }
+      ]
+    };
+
+    CROP_DATA['Marigold'] = {
+      icon: '🌼', days: 90, soil: 'Well Drained Loamy', water: 'Moderate', sunlight: 'Full Sun', yield: '4–6 tons flowers/acre',
+      stages: [
+        { name: 'Nursery & Transplanting', icon: '🪛', days: 'Day 1–30', color: '#8B5E3C', water: 'Keep seedbed moist', fertilizer: 'FYM in main field', pest: 'Cutworms', disease: 'Damping Off', tip: 'Pinch the main shoot 40 days after transplanting to encourage more branches and flowers.' },
+        { name: 'Vegetative & Branching', icon: '🌿', days: 'Day 31–50', color: '#3d7a3a', water: 'Every 7–8 days', fertilizer: 'Nitrogen split dose', pest: 'Red Spider Mite, Aphids', disease: 'Leaf Spot', tip: 'Keep the field weed-free during early growth stages.' },
+        { name: 'Bud Stage & Flowering', icon: '🌼', days: 'Day 51–75', color: '#d4952a', water: 'Critical: during flower initiation', fertilizer: 'Potassium + Phosphorus', pest: 'Helicoverpa (Bud Borer)', disease: 'Powdery Mildew, Flower Blight', tip: 'Spray neem oil or bio-pesticides. Avoid overhead watering to prevent flower blight.' },
+        { name: 'Plucking (Harvest)', icon: '🌸', days: 'Day 76–90', color: '#e8a838', water: 'Maintain light moisture', fertilizer: 'None', pest: 'Thrips', disease: 'Botrytis', tip: 'Pluck fully opened flowers in the early morning. Pack in aerated gunny bags.' }
+      ]
+    };
 
 
 
