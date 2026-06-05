@@ -1,5 +1,6 @@
 {
   "framework": "create-react-app",
+  "installCommand": "cd mobile-app && npm install",
   "buildCommand": "cd mobile-app && npx expo export -p web",
   "outputDirectory": "mobile-app/dist"
 }
