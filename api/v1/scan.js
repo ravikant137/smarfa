@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   const { image_base64, crop_hint } = req.body;
   if (!image_base64) return res.status(400).json({ success: false, message: 'image_base64 is required' });
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPEN_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(500).json({ success: false, message: 'OpenAI API key not configured' });
 
   let prompt = `You are an expert Plant & Agricultural AI Assistant with deep knowledge of crops, fruits, flowers, and ornamental plants.
