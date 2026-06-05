@@ -74,7 +74,13 @@ func CallOllamaDirectly(req models.ScanRequest) ([]byte, error) {
 		base64Str = base64Str[idx+1:]
 	}
 
-	ollamaURL := "http://localhost:11434/api/generate"
+	// Check for OpenAI API key
+	openAIKey := os.Getenv("OPENAI_API_KEY")
+	if openAIKey == "" {
+		return nil, fmt.Errorf("OPENAI_API_KEY is missing")
+	}
+
+	openAIURL := "https://api.openai.com/v1/chat/completions"
 	prompt := `You are an agricultural plant disease expert.
 
 Analyze the uploaded crop image carefully.
@@ -97,37 +103,42 @@ Return ONLY a valid JSON object matching this structure exactly:
 		prompt += fmt.Sprintf("\nHint: The farmer suspects this is a %s crop.", req.CropHint)
 	}
 
-	modelName := os.Getenv("OLLAMA_MODEL")
+	modelName := os.Getenv("OPENAI_MODEL")
 	if modelName == "" {
-		modelName = "qwen2.5vl:7b" // Default to the Vision model
+		modelName = "gpt-4o" // Default to GPT-4o vision model
 	}
 
 	payload := map[string]interface{}{
-		"model":  modelName,
-		"prompt": prompt,
-		"images": []string{base64Str},
-		"format": "json",
-		"stream": false,
-		"options": map[string]interface{}{
-			"temperature": 0.2, // Low temp for more factual crop analysis
+		"model": modelName,
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": []map[string]interface{}{
+					{"type": "text", "text": prompt},
+					{"type": "image_url", "image_url": map[string]string{"url": "data:image/jpeg;base64," + base64Str}},
+				},
+			},
 		},
+		"response_format": map[string]string{"type": "json_object"},
+		"temperature":     0.2,
 	}
 	
 	payloadBytes, _ := json.Marshal(payload)
-	httpReq, _ := http.NewRequest("POST", ollamaURL, bytes.NewBuffer(payloadBytes))
+	httpReq, _ := http.NewRequest("POST", openAIURL, bytes.NewBuffer(payloadBytes))
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+openAIKey)
 	
-	client := &http.Client{Timeout: 300 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		log.Printf("Ollama HTTP Error: %v", err)
+		log.Printf("OpenAI HTTP Error: %v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		log.Printf("Ollama API Error (Status %d): %s", resp.StatusCode, string(bodyBytes))
+		log.Printf("OpenAI API Error (Status %d): %s", resp.StatusCode, string(bodyBytes))
 		var aiData struct {
 			CropDetected     string  `json:"crop_detected"`
 			IsHealthy        bool    `json:"is_healthy"`
@@ -151,10 +162,20 @@ Return ONLY a valid JSON object matching this structure exactly:
 		return json.Marshal(finalResp)
 	}
 
-	var ollamaResp struct {
-		Response string `json:"response"`
+	var openAIResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
 	}
-	json.Unmarshal(bodyBytes, &ollamaResp)
+	json.Unmarshal(bodyBytes, &openAIResp)
+	
+	if len(openAIResp.Choices) == 0 {
+		return nil, fmt.Errorf("No choices returned from OpenAI")
+	}
+	
+	responseText := openAIResp.Choices[0].Message.Content
 
 	var aiData struct {
 		CropDetected     string  `json:"crop_detected"`
@@ -169,7 +190,7 @@ Return ONLY a valid JSON object matching this structure exactly:
 	aiData.Severity = "warning"
 	aiData.Confidence = 75.0
 	aiData.HealthAssessment = "Unable to fully analyze the image. Please try again."
-	_ = json.Unmarshal([]byte(ollamaResp.Response), &aiData)
+	_ = json.Unmarshal([]byte(responseText), &aiData)
 
 	finalResp := map[string]interface{}{
 		"crop_detected":     aiData.CropDetected,
@@ -189,7 +210,12 @@ func CallOllamaForDocument(req models.ScanRequest) ([]byte, error) {
 		base64Str = base64Str[idx+1:]
 	}
 
-	ollamaURL := "http://localhost:11434/api/generate"
+	openAIKey := os.Getenv("OPENAI_API_KEY")
+	if openAIKey == "" {
+		return nil, fmt.Errorf("OPENAI_API_KEY is missing")
+	}
+
+	openAIURL := "https://api.openai.com/v1/chat/completions"
 	prompt := `You are an expert agricultural assistant. Analyze the uploaded image of a document (e.g., pesticide label, fertilizer bag, prescription, or soil report).
 Extract the key information and return ONLY a valid JSON object matching this exact structure:
 {
@@ -200,43 +226,56 @@ Extract the key information and return ONLY a valid JSON object matching this ex
   "active_ingredients": "List of active ingredients"
 }`
 
-	modelName := os.Getenv("OLLAMA_MODEL")
+	modelName := os.Getenv("OPENAI_MODEL")
 	if modelName == "" {
-		modelName = "qwen2.5vl:7b" // Default to the Vision model
+		modelName = "gpt-4o"
 	}
 
 	payload := map[string]interface{}{
-		"model":  modelName,
-		"prompt": prompt,
-		"images": []string{base64Str},
-		"format": "json",
-		"stream": false,
-		"options": map[string]interface{}{
-			"temperature": 0.1, // Very low temp for OCR/Extraction
+		"model": modelName,
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": []map[string]interface{}{
+					{"type": "text", "text": prompt},
+					{"type": "image_url", "image_url": map[string]string{"url": "data:image/jpeg;base64," + base64Str}},
+				},
+			},
 		},
+		"response_format": map[string]string{"type": "json_object"},
+		"temperature":     0.1,
 	}
 	
 	payloadBytes, _ := json.Marshal(payload)
-	httpReq, _ := http.NewRequest("POST", ollamaURL, bytes.NewBuffer(payloadBytes))
+	httpReq, _ := http.NewRequest("POST", openAIURL, bytes.NewBuffer(payloadBytes))
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+openAIKey)
 	
-	client := &http.Client{Timeout: 300 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		log.Printf("Ollama HTTP Error: %v", err)
+		log.Printf("OpenAI HTTP Error: %v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Ollama API Error: %s", string(bodyBytes))
+		return nil, fmt.Errorf("OpenAI API Error: %s", string(bodyBytes))
 	}
 
-	var ollamaResp struct {
-		Response string `json:"response"`
+	var openAIResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
 	}
-	json.Unmarshal(bodyBytes, &ollamaResp)
+	json.Unmarshal(bodyBytes, &openAIResp)
 
-	return []byte(ollamaResp.Response), nil
+	if len(openAIResp.Choices) == 0 {
+		return nil, fmt.Errorf("No choices returned from OpenAI")
+	}
+
+	return []byte(openAIResp.Choices[0].Message.Content), nil
 }

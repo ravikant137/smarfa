@@ -59,6 +59,15 @@ func main() {
 	app.Get("/ai_status", api.HandleAIStatus)
 	app.Get("/crop_lifecycle/:crop", api.HandleGetEmptyList)
 
+	// API Group (Matches Vercel frontend paths exactly)
+	apiGroup := app.Group("/api")
+	apiGroup.Post("/login", api.HandleLogin)
+	apiGroup.Post("/register", api.HandleRegister)
+	apiGroup.Get("/summary", api.HandleGetSummary)
+	apiGroup.Get("/reports/overview", api.HandleGetSummary)
+	apiGroup.Get("/alerts", api.HandleGetEmptyList)
+	apiGroup.Get("/scan_history", api.HandleGetEmptyList)
+
 	// Fallback for cached browsers and legacy UI
 	app.Post("/analyze_crop", api.HandleLegacyScanRequest)
 
