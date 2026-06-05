@@ -44,7 +44,7 @@ export default function RegisterScreen({ navigation }) {
         setError('Registration failed. Please try again.');
       }
     } catch (err) {
-      setError(err.message || 'Registration failed. Please try again.');
+      setError(`Debug URL: ${process.env.EXPO_PUBLIC_SUPABASE_URL || 'missing'} | Err: ${err.message || 'Failed'}`);
     } finally {
       setLoading(false);
     }
