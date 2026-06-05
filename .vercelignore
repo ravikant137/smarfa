@@ -1,0 +1,10 @@
+ai-service/
+smartfarm-ai/
+requirements.txt
+gateway/
+smarfa.db*
+*.db
+*.bat
+*.ps1
+venv/
+.venv/
