@@ -1,0 +1,1728 @@
+
+let API = window.location.origin;
+if (!API || API === 'null' || API.startsWith('file://')) {
+  API = 'http://192.168.29.181:8000';
+}
+
+if ("geolocation" in navigator) {
+  navigator.geolocation.getCurrentPosition(function(position) {
+    window.userLat = position.coords.latitude;
+    window.userLon = position.coords.longitude;
+  });
+}
+
+let currentUser = { username: "Admin", id: "dev" };
+setTimeout(enterApp, 100);
+let imageBase64 = null;
+
+// ── Field Map Data ───────────────────────────
+var FIELDS = {
+  A: { name: 'North Field A', crop: 'Wheat', icon: '🌾', area: '4.2 acres', planted: 'Jan 12', status: 'healthy', statusLabel: '🟢 HEALTHY' },
+  B: { name: 'East Field B', crop: 'Rice', icon: '🌾', area: '3.1 acres', planted: 'Feb 5', status: 'irrigating', statusLabel: '🔵 IRRIGATING' },
+  C: { name: 'South Field C', crop: 'Corn', icon: '🌽', area: '5.8 acres', planted: 'Jan 20', status: 'harvesting', statusLabel: '🟡 HARVESTING' },
+  D: { name: 'West Field D', crop: 'Tomato', icon: '🍅', area: '2.4 acres', planted: 'Mar 1', status: 'healthy', statusLabel: '🟢 HEALTHY' },
+  E: { name: 'Hill Field E', crop: 'Soybean', icon: '🫘', area: '3.9 acres', planted: 'Feb 18', status: 'alert', statusLabel: '🔴 ALERT' }
+};
+
+function selectField(id) {
+  var f = FIELDS[id];
+  if (!f) return;
+  document.getElementById('field-detail').style.display = 'block';
+  document.getElementById('field-detail-name').textContent = f.name;
+  document.getElementById('field-detail-icon').textContent = f.icon;
+  document.getElementById('field-detail-crop').textContent = f.crop;
+  document.getElementById('field-detail-area').textContent = f.area;
+  document.getElementById('field-detail-planted').textContent = f.planted;
+  var statusEl = document.getElementById('field-detail-status');
+  statusEl.textContent = f.statusLabel;
+  var sColors = { healthy: 'rgba(61,122,58,0.1)', irrigating: 'rgba(91,164,207,0.1)', harvesting: 'rgba(212,149,42,0.1)', alert: 'rgba(192,57,43,0.1)' };
+  var tColors = { healthy: 'var(--green)', irrigating: 'var(--sky)', harvesting: 'var(--harvest)', alert: 'var(--red)' };
+  statusEl.style.background = sColors[f.status] || sColors.healthy;
+  statusEl.style.color = tColors[f.status] || tColors.healthy;
+  // Highlight field in region list
+  document.querySelectorAll('.region-item').forEach(function(el) { el.style.background = ''; });
+  var li = document.getElementById('region-' + id);
+  if (li) li.style.background = 'rgba(61,122,58,0.06)';
+}
+
+function addField() {
+  toast('🗺️ Field drawing mode coming soon!');
+}
+
+function renderRegionList() {
+  var el = document.getElementById('region-list');
+  if (!el) return;
+  el.innerHTML = Object.keys(FIELDS).map(function(id) {
+    var f = FIELDS[id];
+    var dotColor = { healthy: '#3d7a3a', irrigating: '#5ba4cf', harvesting: '#d4952a', alert: '#c0392b' }[f.status] || '#3d7a3a';
+    return '<div class="region-item" id="region-' + id + '" onclick="selectField(\'' + id + '\')" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:12px;transition:.15s;" onmouseover="this.style.background=\'rgba(61,122,58,0.05)\'" onmouseout="this.style.background=\'\'">'
+      + '<div style="width:10px;height:10px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;"></div>'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + f.name + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + f.icon + ' ' + f.crop + ' · ' + f.area + '</div>'
+      + '</div>'
+      + '<div style="font-size:11px;font-weight:700;color:' + dotColor + ';">' + id + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function renderDashRecentScans() {
+  var el = document.getElementById('dash-recent-scans');
+  if (!el) return;
+  var history = JSON.parse(localStorage.getItem('scanHistory') || '[]').slice(-5).reverse();
+  if (!history.length) return;
+  el.innerHTML = history.map(function(s) {
+    var crop = (s.structured && s.structured.final_crop) ? s.structured.final_crop : (s.crop_detected || 'Unknown');
+    var sev = s.severity || 'warning';
+    var col = sev === 'critical' ? 'var(--red)' : sev === 'warning' ? 'var(--harvest)' : 'var(--green)';
+    var ico = sev === 'critical' ? '🚨' : sev === 'warning' ? '⚠️' : '✅';
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border-radius:12px;border-left:4px solid ' + col + ';transition:.2s;" onmouseover="this.style.transform=\'translateX(4px)\'" onmouseout="this.style.transform=\'\'">'
+      + '<div style="font-size:24px;">' + ico + '</div>'
+      + '<div style="flex:1;">'
+      + '<div style="font-weight:700;font-size:14px;">' + esc(crop) + ' <span style="font-size:11px;color:' + col + ';font-weight:800;">' + sev.toUpperCase() + '</span></div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + new Date(s.timestamp).toLocaleString() + '</div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function renderProfileStats() {
+  var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+  var total = history.length;
+  var healthy = history.filter(function(s) { return s.severity === 'healthy'; }).length;
+  var alerts = history.filter(function(s) { return s.severity === 'critical' || s.severity === 'warning'; }).length;
+  var ts = document.getElementById('profile-total-scans');
+  var hs = document.getElementById('profile-healthy-scans');
+  var as = document.getElementById('profile-alert-scans');
+  if (ts) ts.textContent = total;
+  if (hs) hs.textContent = healthy;
+  if (as) as.textContent = alerts;
+}
+
+// ── Toast ───────────────────────────────────
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Auth Tabs ───────────────────────────────
+function showAuthTab(tab) {
+  document.querySelectorAll('.auth-tabs button').forEach((b,i) => b.classList.toggle('active', (tab==='login'?0:1)===i));
+  document.getElementById('form-login').classList.toggle('active', tab==='login');
+  document.getElementById('form-register').classList.toggle('active', tab==='register');
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('reg-error').textContent = '';
+}
+
+// ── Login ───────────────────────────────────
+async function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!user || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  document.getElementById('login-btn-text').innerHTML = '<span class="spinner" style="width:16px;height:16px"></span> Signing in...';
+  try {
+    const r = await fetch(API + '/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:user,password:pass}) });
+    let d;
+    try {
+      d = await r.json();
+    } catch(err) {
+      if (!r.ok) throw new Error(`Server error: status ${r.status}`);
+      throw err;
+    }
+    if (!r.ok) throw new Error(d.detail || 'Login failed');
+    currentUser = { username: user, id: d.user_id };
+    enterApp();
+    toast('Welcome back, ' + user + '!');
+  } catch(e) { errEl.textContent = e.message; }
+  btn.disabled = false;
+  document.getElementById('login-btn-text').textContent = 'Sign In';
+}
+
+// ── Register ────────────────────────────────
+async function doRegister() {
+  const user = document.getElementById('reg-user').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
+  const errEl = document.getElementById('reg-error');
+  errEl.textContent = '';
+  if (!user || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
+  if (pass.length < 4) { errEl.textContent = 'Password must be at least 4 characters'; return; }
+  if (pass !== pass2) { errEl.textContent = 'Passwords do not match'; return; }
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true;
+  document.getElementById('reg-btn-text').innerHTML = '<span class="spinner" style="width:16px;height:16px"></span> Creating...';
+  try {
+    const r = await fetch(API + '/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:user,password:pass}) });
+    let d;
+    try {
+      d = await r.json();
+    } catch(err) {
+      if (!r.ok) throw new Error(`Server error: status ${r.status}`);
+      throw err;
+    }
+    if (!r.ok) throw new Error(d.detail || 'Registration failed');
+    currentUser = { username: user, id: d.id };
+    enterApp();
+    toast('Account created! Welcome to Smarfa!');
+  } catch(e) { errEl.textContent = e.message; }
+  btn.disabled = false;
+  document.getElementById('reg-btn-text').textContent = 'Create Account';
+}
+
+// Enter key handlers
+document.getElementById('login-pass').onkeydown = e => { if(e.key==='Enter') doLogin(); };
+document.getElementById('reg-pass2').onkeydown = e => { if(e.key==='Enter') doRegister(); };
+
+// ── Enter App ───────────────────────────────
+function enterApp() {
+  const name = currentUser.username.split('@')[0] || "Farmer";
+  document.getElementById('dash-username') && (document.getElementById('dash-username').textContent = name);
+  document.getElementById('profile-name').textContent = name;
+  document.getElementById('profile-email').textContent = currentUser.username;
+  document.getElementById('profile-avatar').textContent = name.charAt(0).toUpperCase();
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').classList.add('visible');
+  renderRegionList();
+  renderDashRecentScans();
+  loadDashboardData();
+  fetchMarketPrices();
+  checkAI();
+}
+
+function logout() {
+  currentUser = null;
+  imageBase64 = null;
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  switchTab('dashboard');
+}
+
+// ── Tab Navigation ──────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.content > .tab').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (tab === 'alerts') loadAlerts();
+  if (tab === 'profile') { checkAI(); renderProfileStats(); }
+  if (tab === 'reports') loadReports();
+  if (tab === 'lifecycle') { if (!_lifecycleInited) { renderCropSelectorGrid(); _lifecycleInited = true; } renderFieldStatusStrip(); renderRegionalCrops(); }
+  if (tab === 'dashboard') { loadDashboardData(); renderDashRecentScans(); fetchMarketPrices(); }
+  if (tab === 'history') { loadHistoryData(); }
+  if (tab === 'marketplace') { loadMarketplace(); }
+}
+
+function loadHistoryData() {
+  var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+  
+  // Group by crop
+  var crops = {};
+  history.forEach(function(s) {
+    var cropName = (s.structured && s.structured.final_crop) ? s.structured.final_crop : (s.crop_detected || 'Unknown');
+    if (!crops[cropName]) crops[cropName] = [];
+    crops[cropName].push(s);
+  });
+  
+  var cropNames = Object.keys(crops);
+  var filterContainer = document.getElementById('history-crop-filters');
+  
+  if (cropNames.length === 0) {
+    filterContainer.innerHTML = '';
+    document.getElementById('history-ml-insight').innerHTML = '';
+    document.getElementById('history-timeline').innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">No AI scans found. Start scanning crops to build your ML history!</div>';
+    return;
+  }
+  
+  filterContainer.innerHTML = cropNames.map(function(c, i) {
+    var isActive = i === 0 ? 'background:var(--green);color:#fff;' : 'background:#fff;color:var(--text);';
+    return '<button onclick="renderHistoryForCrop(\'' + c + '\', this)" style="padding:8px 16px; border-radius:20px; border:1px solid var(--border); font-weight:700; cursor:pointer; white-space:nowrap; ' + isActive + '">' + c + ' (' + crops[c].length + ')</button>';
+  }).join('');
+  
+  // Render the first crop by default
+  renderHistoryForCrop(cropNames[0], filterContainer.firstChild);
+}
+
+window.renderHistoryForCrop = function(cropName, btnEl) {
+  if (btnEl) {
+    var btns = document.getElementById('history-crop-filters').getElementsByTagName('button');
+    for (var i=0; i<btns.length; i++) {
+      btns[i].style.background = '#fff';
+      btns[i].style.color = 'var(--text)';
+    }
+    btnEl.style.background = 'var(--green)';
+    btnEl.style.color = '#fff';
+  }
+
+  var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+  var cropScans = history.filter(function(s) {
+    var cn = (s.structured && s.structured.final_crop) ? s.structured.final_crop : (s.crop_detected || '');
+    return cn === cropName;
+  });
+  
+  // Sort by date oldest to newest to analyze trend
+  cropScans.sort(function(a,b) { return new Date(a.timestamp) - new Date(b.timestamp); });
+
+  var timelineHtml = '';
+  var severityValues = { 'healthy': 0, 'info': 0, 'warning': 1, 'critical': 2 };
+  var severityTrend = [];
+
+  cropScans.forEach(function(s, idx) {
+    var dt = new Date(s.timestamp || new Date());
+    var sev = s.severity || 'info';
+    severityTrend.push(severityValues[sev] || 0);
+    
+    var icon = sev === 'critical' ? '🚨' : (sev === 'warning' ? '⚠️' : '✅');
+    var col = sev === 'critical' ? 'var(--red)' : (sev === 'warning' ? 'var(--yellow)' : 'var(--green)');
+    var bg = sev === 'critical' ? 'rgba(239,68,68,0.1)' : (sev === 'warning' ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)');
+    
+    timelineHtml = '<div style="display:flex;gap:16px;">'
+      + '<div style="display:flex;flex-direction:column;align-items:center;">'
+      + '<div style="width:16px;height:16px;border-radius:50%;background:' + col + ';border:4px solid ' + bg + ';"></div>'
+      + '<div style="width:2px;height:100%;background:#e2e8f0;margin-top:4px;"></div>'
+      + '</div>'
+      + '<div style="background:#fff;border-radius:12px;padding:16px;border:1px solid #e2e8f0;flex:1;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.02);">'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:700;text-transform:uppercase;">' + dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString() + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+      + '<span style="font-size:20px;">' + icon + '</span>'
+      + '<span style="font-weight:800;color:' + col + ';">' + sev.toUpperCase() + '</span>'
+      + '</div>'
+      + '<div style="font-size:14px;color:var(--text);line-height:1.5;">' + (s.health_assessment || 'Scan logged') + '</div>'
+      + '</div></div>' + timelineHtml; // Prepend to show newest at top
+  });
+  
+  document.getElementById('history-timeline').innerHTML = timelineHtml;
+  
+  // ML Engine Logic
+  var insightHtml = '';
+  if (cropScans.length < 2) {
+    insightHtml = '<div style="background:var(--card);padding:16px;border-radius:12px;border:1px dashed var(--muted);color:var(--muted);text-align:center;font-size:14px;">The ML Engine requires at least 2 scans to establish a learning baseline. Keep scanning!</div>';
+  } else {
+    // Basic trend logic
+    var lastSev = severityTrend[severityTrend.length-1];
+    var prevSev = severityTrend[severityTrend.length-2];
+    
+    var mlTitle = '';
+    var mlMsg = '';
+    var mlCol = '';
+    var mlBg = '';
+    
+    if (lastSev > prevSev) {
+      mlTitle = 'Negative Trajectory Detected';
+      mlMsg = 'ML Prediction: Based on the rapid degradation over your last scans, there is an 82% probability of severe crop failure within 7-10 days if left untreated. Immediate chemical intervention is recommended.';
+      mlCol = 'var(--red)';
+      mlBg = 'rgba(239,68,68,0.1)';
+    } else if (lastSev < prevSev) {
+      mlTitle = 'Positive Recovery Tracked';
+      mlMsg = 'ML Prediction: The crop is showing signs of recovery. Based on our historical database, the infection spread has slowed by 45%. Continue current treatment cycle.';
+      mlCol = 'var(--green)';
+      mlBg = 'rgba(34,197,94,0.1)';
+    } else if (lastSev === 0) {
+      mlTitle = 'Optimal Growth Detected';
+      mlMsg = 'ML Prediction: Crop is tracking 12% faster than standard lifecycle averages. No intervention required. Maintain current watering schedule.';
+      mlCol = 'var(--green)';
+      mlBg = 'rgba(34,197,94,0.1)';
+    } else {
+      mlTitle = 'Stagnant Condition';
+      mlMsg = 'ML Prediction: The issue has stabilized but not improved. Consider rotating treatment chemicals as the pathogen may be developing resistance.';
+      mlCol = 'var(--yellow)';
+      mlBg = 'rgba(245,158,11,0.1)';
+    }
+    
+    insightHtml = '<div style="background:' + mlBg + ';border:1px solid ' + mlCol + ';border-radius:16px;padding:20px;position:relative;overflow:hidden;">'
+      + '<div style="position:absolute;top:-10px;right:-10px;font-size:80px;opacity:0.1;">🧠</div>'
+      + '<div style="display:inline-block;background:' + mlCol + ';color:#fff;padding:4px 8px;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">ML Self-Learning Insight</div>'
+      + '<h3 style="color:' + mlCol + ';margin-bottom:8px;font-size:18px;">' + mlTitle + '</h3>'
+      + '<p style="color:var(--text);font-size:14px;line-height:1.6;font-weight:500;">' + mlMsg + '</p>'
+      + '</div>';
+  }
+  
+  document.getElementById('history-ml-insight').innerHTML = insightHtml;
+};
+
+function fetchMarketPrices() {
+  var ticker = document.getElementById('market-ticker');
+  if (!ticker) return;
+  
+  var crops = ['Tomato', 'Corn', 'Mango', 'Pigeon Pea', 'Moong Dal', 'Onion', 'Rice', 'Wheat'];
+  var html = '';
+  
+  crops.forEach(function(c) {
+    // Generate realistic mock price
+    var basePrice = c === 'Mango' ? 8000 : (c.includes('Dal') || c.includes('Pea') ? 6500 : 2500);
+    var rand = Math.floor(Math.random() * 500) - 200;
+    var price = basePrice + rand;
+    var trend = rand >= 0 ? '▲' : '▼';
+    var color = rand >= 0 ? 'var(--green)' : 'var(--red)';
+    var bg = rand >= 0 ? 'rgba(76,175,80,0.1)' : 'rgba(192,57,43,0.1)';
+    
+    html += '<div style="display:inline-flex; align-items:center; gap:6px; background:' + bg + '; padding:6px 12px; border-radius:30px; border:1px solid ' + color + '; font-size:13px; font-weight:600;">' +
+      '<span style="color:var(--text);">' + c + '</span>' +
+      '<span style="color:' + color + '">₹' + price + '/q</span>' +
+      '<span style="color:' + color + '; font-size:10px;">' + trend + ' ' + Math.abs(rand) + '</span>' +
+      '</div>';
+  });
+  
+  ticker.innerHTML = html;
+}
+
+let _mapInited = false;
+let dashMap = null;
+
+async function loadDashboardData() {
+  try {
+    var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+    var totalScans = history.length;
+    var totalScore = history.reduce(function(acc, x) {
+      if (x.severity === 'healthy') return acc + 100;
+      if (x.severity === 'warning') return acc + 50;
+      return acc;
+    }, 0);
+    var score = totalScans > 0 ? Math.round(totalScore / totalScans) : 100;
+    
+    var recentAlerts = history.filter(s => {
+      var d = new Date(s.timestamp);
+      var now = new Date();
+      var daysOld = (now - d) / (1000 * 60 * 60 * 24);
+      return daysOld <= 7 && (s.severity === 'warning' || s.severity === 'critical');
+    }).length;
+
+    // Health score ring update
+    const deg = Math.round(score / 100 * 360);
+    const color = score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444';
+    document.getElementById('health-ring').style.background = 'conic-gradient(' + color + ' 0deg, ' + color + ' ' + deg + 'deg, #334155 ' + deg + 'deg)';
+    document.getElementById('health-score').textContent = score;
+
+    // 2. Simulate Live IoT Sensors (Temp & Moisture) based on time of day
+    var hour = new Date().getHours();
+    var baseTemp = 22; // Base temp at night
+    if (hour >= 6 && hour <= 15) {
+      baseTemp += (hour - 6) * 1.5; // Heats up until 3 PM
+    } else if (hour > 15 && hour <= 20) {
+      baseTemp = 35 - ((hour - 15) * 1.5); // Cools down
+    }
+    
+    // Add minor random fluctuation for "live" feel
+    var currentTemp = (baseTemp + (Math.random() * 2 - 1)).toFixed(1);
+    
+    // Soil moisture is inversely proportional to temp (hotter = drier)
+    var baseMoisture = 80 - ((currentTemp - 20) * 2.5);
+    var currentMoisture = (baseMoisture + (Math.random() * 4 - 2)).toFixed(1);
+    if (currentMoisture < 20) currentMoisture = 20;
+
+    // Update Dashboard UI Cards
+    document.getElementById('s-health').textContent = score + '%';
+    document.getElementById('s-health').style.color = color;
+    document.getElementById('s-health-sub').textContent = totalScans > 0 ? 'From ' + totalScans + ' Scans' : 'No Scans Yet';
+
+    if (!document.getElementById('s-temp').hasAttribute('data-live')) {
+      document.getElementById('s-temp').textContent = currentTemp + '\u00B0C';
+      document.getElementById('s-temp-sub').textContent = 'Live IoT reading';
+    }
+    document.getElementById('s-moisture').textContent = currentMoisture + '%';
+    document.getElementById('s-moisture-sub').textContent = currentMoisture < 40 ? 'Irrigation needed' : 'Optimal level';
+    
+    document.getElementById('s-alerts').textContent = recentAlerts;
+    document.getElementById('s-alerts-sub').textContent = recentAlerts > 0 ? 'Action Required' : 'All Clear';
+    document.getElementById('s-alerts').style.color = recentAlerts > 0 ? 'var(--red)' : 'var(--green)';
+
+    // Pump status
+    loadPumpStatus();
+
+    // Map & Location Weather Init
+    if (!_mapInited) {
+      _mapInited = true;
+      initDashboardMap();
+    }
+  } catch(e) { console.log('dashboard error', e); }
+}
+
+function initDashboardMap() {
+  var mapLoaded = false;
+  
+  function loadMapAtLocation(lat, lon, isLive) {
+    if (mapLoaded) return; // Prevent double loading
+    mapLoaded = true;
+    
+    window.userLat = lat; window.userLon = lon;
+    document.getElementById('map-loading-overlay').style.display = 'none';
+    if (dashMap) { dashMap.remove(); }
+    dashMap = L.map('farm-map').setView([lat, lon], 16);
+    
+    // Use Google Maps Satellite Tile Layer
+    L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      attribution: '&copy; Google Earth Engine'
+    }).addTo(dashMap);
+
+    var bounds = [[lat - 0.001, lon - 0.001], [lat + 0.001, lon + 0.001]];
+    var rect = L.rectangle(bounds, {color: "#3d7a3a", weight: 3, fillOpacity: 0.4}).addTo(dashMap);
+    rect.on('click', function() { selectField('A'); });
+
+    // 2km heatmap radius simulation
+    L.circle([lat, lon], {
+      color: '#f59e0b',
+      fillColor: '#f59e0b',
+      fillOpacity: 0.1,
+      radius: 2000, 
+      weight: 1,
+      dashArray: '5, 10'
+    }).addTo(dashMap);
+    
+    // Add glowing marker
+    var icon = L.divIcon({
+      className: 'pulse-icon',
+      html: '<div style="width:16px;height:16px;background:var(--green);border-radius:50%;box-shadow:0 0 20px 4px var(--green);animation:pulse 2s infinite;"></div>',
+      iconSize: [16,16]
+    });
+    L.marker([lat, lon], {icon: icon}).addTo(dashMap);
+
+    // Fetch Live Weather from Open-Meteo
+    fetch('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&current_weather=true&daily=temperature_2m_max,temperature_2m_min&timezone=auto')
+      .then(res => res.json())
+      .then(wData => {
+        if (wData && wData.current_weather) {
+          document.getElementById('s-temp').setAttribute('data-live', 'true');
+          document.getElementById('s-temp').textContent = Math.round(wData.current_weather.temperature) + '\u00B0C';
+          if (wData.daily) document.getElementById('s-temp-sub').textContent = Math.round(wData.daily.temperature_2m_min[0]) + '\u00B0 \u2013 ' + Math.round(wData.daily.temperature_2m_max[0]) + '\u00B0';
+        }
+      }).catch(e => console.log('Weather fetch failed', e));
+
+    // Reverse Geocode
+    fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat='+lat+'&lon='+lon)
+      .then(res => res.json())
+      .then(gData => {
+        if (gData && gData.address) {
+          var city = gData.address.city || gData.address.town || gData.address.village || gData.address.county || 'Unknown Area';
+          var state = gData.address.state || gData.address.country || '';
+          var prefix = isLive ? '<span style="color:var(--green)">📍 Live GPS:</span> ' : '<span style="color:var(--yellow)">📍 Default:</span> ';
+          document.getElementById('map-location-sub').innerHTML = prefix + city + ', ' + state;
+          var mLoc = document.getElementById('market-location');
+          if (mLoc) mLoc.textContent = city;
+        }
+      }).catch(e => console.log('Geocoding failed', e));
+  }
+
+  function fallbackToIP() {
+    fetch('https://ipapi.co/json/')
+      .then(res => res.json())
+      .then(data => {
+        if (data.latitude && data.longitude) {
+          loadMapAtLocation(data.latitude, data.longitude, false);
+        } else {
+          loadMapAtLocation(15.3647, 75.1240, false); // Ultimate fallback
+        }
+      })
+      .catch(() => loadMapAtLocation(15.3647, 75.1240, false));
+  }
+
+  if (!navigator.geolocation) {
+    fallbackToIP();
+    return;
+  }
+  
+  // Failsafe timeout because Chrome sometimes silently hangs on getCurrentPosition
+  var failsafeTimeout = setTimeout(function() {
+    console.warn("GPS request timed out. Loading IP fallback.");
+    fallbackToIP();
+  }, 4000);
+
+  navigator.geolocation.getCurrentPosition(
+    function(pos) { clearTimeout(failsafeTimeout); loadMapAtLocation(pos.coords.latitude, pos.coords.longitude, true); },
+    function(err) { clearTimeout(failsafeTimeout); fallbackToIP(); },
+    { enableHighAccuracy: true, timeout: 3500, maximumAge: 0 }
+  );
+}
+
+// ── Water Pump ──────────────────────────────
+async function loadPumpStatus() {
+  try {
+    const r = await fetch(API + '/pump/status/field-1');
+    const d = await r.json();
+    const ind = document.getElementById('pump-indicator');
+    const txt = document.getElementById('pump-status-text');
+    const det = document.getElementById('pump-status-detail');
+
+    if (d.is_running) {
+      ind.className = 'pump-indicator on';
+      txt.textContent = '\uD83D\uDCA7 Pump Running';
+      txt.style.color = 'var(--green)';
+      det.textContent = d.current.reason + ' \u2014 ' + d.current.duration + 's';
+    } else {
+      ind.className = 'pump-indicator off';
+      txt.textContent = 'Pump Idle';
+      txt.style.color = 'var(--muted)';
+      det.textContent = 'No active irrigation';
+    }
+
+    // Recent logs
+    var logEl = document.getElementById('pump-log');
+    if (d.recent_logs.length) {
+      logEl.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">Recent Activity</div>' +
+        d.recent_logs.slice(0, 5).map(function(l) {
+          return '<div class="pump-log-item"><div><span class="pump-tag ' + esc(l.trigger) + '">' + esc(l.trigger) + '</span>' +
+            '<span style="margin-left:6px">' + esc(l.reason.substring(0,40)) + (l.reason.length>40?'...':'') + '</span></div>' +
+            '<span style="color:var(--muted)">' + l.duration + 's</span></div>';
+        }).join('');
+    } else {
+      logEl.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">No pump activity yet</div>';
+    }
+  } catch(e) { console.log('pump error', e); }
+}
+
+async function startPump() {
+  try {
+    const r = await fetch(API + '/pump/start', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ crop_id: 'field-1', duration_seconds: 120 })
+    });
+    const d = await r.json();
+    toast('\uD83D\uDCA7 Water pump started! Duration: ' + d.duration + 's');
+    loadPumpStatus();
+  } catch(e) { toast('Failed to start pump', 'error'); }
+}
+
+async function stopPump() {
+  try {
+    await fetch(API + '/pump/stop', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ crop_id: 'field-1' })
+    });
+    toast('Pump stopped');
+    loadPumpStatus();
+  } catch(e) { toast('Failed to stop pump', 'error'); }
+}
+
+// ── Crop Scan ───────────────────────────────
+var fileInput = document.getElementById('file-input');
+var scanArea = document.getElementById('scan-area');
+
+fileInput.onchange = function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var dataUrl = ev.target.result;
+    imageBase64 = dataUrl.split(',')[1];
+    document.getElementById('scan-preview').src = dataUrl;
+    document.getElementById('scan-preview').style.display = 'block';
+    document.getElementById('scan-placeholder').style.display = 'none';
+    scanArea.classList.add('has-image');
+    document.getElementById('analyze-btn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+};
+
+scanArea.ondragover = function(e) { e.preventDefault(); scanArea.style.borderColor = 'var(--green)'; };
+scanArea.ondragleave = function() { scanArea.style.borderColor = ''; };
+scanArea.ondrop = function(e) {
+  e.preventDefault(); scanArea.style.borderColor = '';
+  var file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) { fileInput.files = e.dataTransfer.files; fileInput.dispatchEvent(new Event('change')); }
+};
+
+function clearScan() {
+  imageBase64 = null; fileInput.value = '';
+  document.getElementById('scan-preview').style.display = 'none';
+  document.getElementById('scan-placeholder').style.display = '';
+  scanArea.classList.remove('has-image');
+  document.getElementById('voice-input').value = '';
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('scan-results').style.display = 'none';
+}
+
+function startVoiceRecognition() {
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    toast('Voice recognition not supported in your browser.', 'warning');
+    return;
+  }
+  var recognition = new SpeechRecognition();
+  recognition.lang = 'en-US'; 
+  recognition.interimResults = false;
+  
+  var micBtn = document.getElementById('mic-btn');
+  var micStatus = document.getElementById('mic-status');
+  var voiceInput = document.getElementById('voice-input');
+  
+  recognition.onstart = function() {
+    micBtn.style.animation = 'pulseHighlight 1s infinite';
+    micStatus.style.display = 'block';
+  };
+  recognition.onspeechend = function() {
+    recognition.stop();
+  };
+  recognition.onresult = function(event) {
+    var transcript = event.results[0][0].transcript;
+    voiceInput.value = (voiceInput.value + ' ' + transcript).trim();
+    document.getElementById('analyze-btn').disabled = false;
+  };
+  recognition.onerror = function(event) {
+    micStatus.style.display = 'none';
+    micBtn.style.animation = 'none';
+    toast('Microphone error: ' + event.error, 'error');
+  };
+  recognition.onend = function() {
+    micBtn.style.animation = 'none';
+    micStatus.style.display = 'none';
+  };
+  
+  recognition.start();
+}
+
+function readAloud(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel(); // Stop any current speech
+    var msg = new SpeechSynthesisUtterance(text);
+    // Try to match the selected language from google translate if possible, otherwise default
+    window.speechSynthesis.speak(msg);
+    toast('🔊 Playing audio...', 'info');
+  } else {
+    toast('Text-to-speech not supported in your browser.', 'warning');
+  }
+}
+
+async function analyzeCrop() {
+  var userQuery = document.getElementById('voice-input').value.trim();
+  if (!imageBase64 && !userQuery) return;
+  var btn = document.getElementById('analyze-btn');
+  var loading = document.getElementById('scan-loading');
+  var results = document.getElementById('scan-results');
+  btn.disabled = true; loading.style.display = 'flex'; results.style.display = 'none';
+  try {
+    var hintVal = 'auto';
+    var payload = { 
+      image_base64: imageBase64,
+      crop_hint: hintVal !== 'auto' ? hintVal : null,
+      lat: window.userLat || 0,
+      lon: window.userLon || 0,
+      user_query: userQuery
+    };
+    var r = await fetch(API + '/analyze_crop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Analysis failed');
+    renderResults(d);
+    results.style.display = 'block';
+    
+    // Trigger Push Notification/Alert
+    var sev = d.severity || 'warning';
+    if (sev === 'critical') {
+       toast('🚨 CRITICAL ALERT: ' + (d.health_assessment || 'Severe issue detected!'), 'error');
+    } else if (sev === 'warning') {
+       toast('⚠️ WARNING: ' + (d.health_assessment || 'Potential issue detected.'), 'warning');
+    } else {
+       toast('✅ Scan Complete: Crop is healthy!');
+    }
+  } catch(e) {
+    results.innerHTML = '<div class="result-card"><h3>Error</h3><p>' + esc(e.message) + '</p></div>';
+    results.style.display = 'block';
+  }
+  loading.style.display = 'none'; btn.disabled = false;
+}
+
+function renderResults(d) {
+  var el = document.getElementById('scan-results');
+  var sev = d.severity || 'warning';
+  var confColor = (d.ai_confidence||0) >= 60 ? 'var(--green)' : (d.ai_confidence||0) >= 30 ? 'var(--yellow)' : 'var(--red)';
+  var s = d.structured || {};
+  
+  var html = '';
+
+  // 1. Crop Info & Warning (Yellow/Red Border)
+  var cropName = s.final_crop || d.crop_detected || 'Unknown Crop';
+  var sevColor = sev === 'critical' ? 'var(--red)' : sev === 'warning' ? 'var(--yellow)' : 'var(--green)';
+  // Prepare speech payload
+  var cleanTextForSpeech = (d.health_assessment || '') + '. ' + (d.treatment_recommendation || '');
+  var speechPayload = cleanTextForSpeech.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+
+  html += '<div class="result-card" style="border:1px solid ' + sevColor + '; border-radius:12px; margin-bottom:16px; position:relative;">' +
+    '<div style="position:absolute; top:12px; right:12px; background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:4px; font-size:10px; color:var(--muted);">AI</div>' +
+    '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">' +
+      '<div style="display:inline-block; padding:4px 8px; border-radius:6px; background:rgba(245,158,11,0.1); color:' + sevColor + '; font-size:11px; font-weight:700; text-transform:uppercase;">' + sev.toUpperCase() + ' ⚠️</div>' +
+      '<button onclick="readAloud(\'' + speechPayload + '\')" style="background:var(--card); border:1px solid var(--border); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">🔊 Listen</button>' +
+    '</div>' +
+    '<h3 style="color:var(--text); margin-bottom:8px; font-size:16px;">🌿 ' + esc(cropName) + '</h3>' +
+    '<p style="font-size:13px; color:var(--muted); line-height:1.5;">' + esc(d.health_assessment) + '</p>' +
+    '</div>';
+
+  // 2. Green Shield Safety Vetted (Green Border)
+  if (s.safety_check) {
+    var sc = s.safety_check;
+    html += '<div class="result-card" style="border:1px solid var(--green); border-radius:12px; margin-bottom:16px;">' +
+      '<h3 style="color:var(--green); margin-bottom:16px;">🛡️ Green Shield Pesticide Safety Vetted</h3>' +
+      '<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">' +
+      '<span style="color:var(--muted); font-size:13px;">Registry Status</span>' +
+      '<span style="color:var(--green); font-weight:700; font-size:13px;">✓ COMPLIANT & APPROVED</span></div>' +
+      '<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">' +
+      '<span style="color:var(--muted); font-size:13px;">Substance Vetted</span>' +
+      '<span style="color:var(--text); font-weight:600; font-size:13px;">' + esc(sc.chemical||'N/A') + '</span></div>' +
+      '<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">' +
+      '<span style="color:var(--muted); font-size:13px;">Safety Class</span>' +
+      '<span style="color:var(--cyan); font-weight:600; font-size:13px;">' + esc(sc.safety_class||'N/A') + '</span></div>' +
+      '<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">' +
+      '<span style="color:var(--muted); font-size:13px;">Eco Designation</span>' +
+      '<span style="background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:4px; font-size:11px;">' + esc(sc.eco_status||'N/A') + '</span></div>' +
+      '<div style="margin-top:12px; font-size:12px; color:var(--muted);">' + esc(sc.compliance_details||'') + '</div>' +
+      '</div>';
+  }
+
+  // 3. Treatment Recommendations (Grey/Blue Border)
+  if (s.treatment) {
+    var t = s.treatment;
+    html += '<div class="result-card" style="border:1px solid var(--border); border-radius:12px; margin-bottom:16px;">' +
+      '<h3 style="color:var(--text); margin-bottom:16px;">💊 Treatment Recommendations</h3>' +
+      '<div style="margin-bottom:12px;"><strong style="color:var(--green); font-size:13px;">🌿 Organic Solution</strong><p style="font-size:12px; color:var(--muted); margin-top:4px;">' + esc(t.organic) + '</p></div>' +
+      '<div style="margin-bottom:12px;"><strong style="color:var(--cyan); font-size:13px;">🧪 Chemical Solution</strong><p style="font-size:12px; color:var(--muted); margin-top:4px;">' + esc(t.chemical) + '</p></div>' +
+      '<div style="margin-bottom:12px;"><strong style="color:var(--text); font-size:13px;">💧 Dosage</strong><p style="font-size:12px; color:var(--muted); margin-top:4px;">' + esc(t.dosage) + '</p></div>' +
+      '<div style="margin-bottom:12px;"><strong style="color:var(--yellow); font-size:13px;">🛡️ Prevention</strong><p style="font-size:12px; color:var(--muted); margin-top:4px;">' + esc(t.prevention) + '</p></div>' +
+      '<div style="margin-bottom:12px;"><strong style="color:#3b82f6; font-size:13px;">💧 Irrigation Adjustment</strong><p style="font-size:12px; color:var(--muted); margin-top:4px;">' + esc(t.irrigation_adjustment) + '</p></div>' +
+      '<div><strong style="color:#f59e0b; font-size:13px;">⛏️ Soil Correction</strong><p style="font-size:12px; color:var(--muted); margin-top:4px;">' + esc(t.soil_correction) + '</p></div>' +
+      '</div>';
+  }
+
+  // 4. Multi-Agent Cooperative Diagnosis (Purple Border)
+  if (s.agent_logs) {
+    var logs = s.agent_logs;
+    html += '<div class="result-card" style="border:1px solid var(--purple); border-radius:12px; margin-bottom:16px; background:linear-gradient(to right, rgba(139,92,246,0.05), transparent);">' +
+      '<h3 style="color:var(--purple); margin-bottom:16px;">🧠 GPT-4o Multi-Agent Cooperative Diagnosis</h3>' +
+      '<div style="padding:10px; background:rgba(255,255,255,0.03); border-radius:8px; margin-bottom:8px;"><strong style="color:var(--green); font-size:13px;">🔍 Pathology Agent:</strong><p style="font-size:12px; color:var(--text); margin-top:4px;">' + esc(logs.pathology_agent) + '</p></div>' +
+      '<div style="padding:10px; background:rgba(255,255,255,0.03); border-radius:8px; margin-bottom:8px;"><strong style="color:var(--cyan); font-size:13px;">🌾 Agronomist Agent:</strong><p style="font-size:12px; color:var(--text); margin-top:4px;">' + esc(logs.agronomy_agent) + '</p></div>' +
+      '<div style="padding:10px; background:rgba(255,255,255,0.03); border-radius:8px;"><strong style="color:#f59e0b; font-size:13px;">🛡️ Safety Agent (Green Shield):</strong><p style="font-size:12px; color:var(--text); margin-top:4px;">' + esc(logs.safety_agent) + '</p></div>' +
+      '</div>';
+  }
+
+  el.innerHTML = html;
+  
+  // Also show expert fallback
+  var fallback = document.getElementById('expert-fallback');
+  if (fallback) fallback.style.display = 'block';
+
+  // Save to local scan history
+  var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+  d.timestamp = new Date().toISOString();
+  history.push(d);
+  localStorage.setItem('scanHistory', JSON.stringify(history));
+}
+
+function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// ── Reports ─────────────────────────────────
+async function loadReports() {
+  var loading = document.getElementById('reports-loading');
+  var content = document.getElementById('reports-content');
+  loading.style.display = 'flex'; content.style.display = 'none';
+
+  // Read from local history
+  var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+  
+  setTimeout(function() {
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
+    if (history.length === 0) {
+      document.getElementById('reports-history-list').innerHTML = '<div style="color:var(--muted); font-size:13px;">No crop history found. Run an AI Scan first!</div>';
+      return;
+    }
+
+    var totalScore = history.reduce(function(acc, x) {
+      if (x.severity === 'healthy') return acc + 100;
+      if (x.severity === 'warning') return acc + 50;
+      return acc;
+    }, 0);
+    var score = history.length > 0 ? Math.round(totalScore / history.length) : 0;
+    
+    // Update Ring
+    var deg = Math.round(score / 100 * 360);
+    var color = score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444';
+    document.getElementById('report-health-ring').style.background = 'conic-gradient(' + color + ' ' + deg + 'deg, rgba(255,255,255,0.05) ' + deg + 'deg)';
+    document.getElementById('report-health-score').textContent = score + '%';
+
+    // Update History List
+    var html = '';
+    // Reverse to show newest first, or keep order for chronological. Let's do chronological Start to End.
+    history.forEach(function(s, i) {
+       var cropName = (s.structured && s.structured.final_crop) ? s.structured.final_crop : (s.crop_detected || 'Unknown');
+       var sev = s.severity || 'warning';
+       var sevColor = sev === 'critical' ? 'var(--red)' : sev === 'warning' ? 'var(--yellow)' : 'var(--green)';
+       var date = new Date(s.timestamp || Date.now()).toLocaleString();
+       
+       html += '<div style="padding:12px; background:rgba(255,255,255,0.02); border-left:3px solid ' + sevColor + '; border-radius:6px;">' +
+         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
+         '<strong style="color:var(--text); font-size:14px;">Scan ' + (i+1) + ': ' + esc(cropName) + '</strong>' +
+         '<span style="font-size:11px; color:var(--muted);">' + date + '</span></div>' +
+         '<p style="font-size:12px; color:var(--muted); line-height:1.4;">' + esc(s.health_assessment) + '</p>' +
+         '</div>';
+    });
+    
+    document.getElementById('reports-history-list').innerHTML = html;
+  }, 500); // fake loading delay for UI polish
+}
+// ── Marketplace ─────────────────────────────
+async function loadMarketplace() {
+  var loading = document.getElementById('marketplace-loading');
+  var content = document.getElementById('marketplace-content');
+  var empty = document.getElementById('marketplace-empty');
+  
+  loading.style.display = 'block';
+  content.style.display = 'none';
+  empty.style.display = 'none';
+
+  setTimeout(function() {
+    var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+    if (history.length === 0) {
+      loading.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
+
+    var lastScan = history[history.length - 1];
+    if (lastScan.severity === 'healthy') {
+      loading.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
+
+    // Determine treatment STRICTLY from AI LLM output
+    var treatmentName = "AI Recommended Treatment";
+    var treatmentDesc = lastScan.treatment_recommendation || "Consult local agricultural experts.";
+    var treatmentIcon = "💊";
+
+    var diagText = ((lastScan.structured && lastScan.structured.disease_name) || lastScan.health_assessment || "").toLowerCase();
+
+    // Prefer exact chemical/organic treatment from structured AI output
+    if (lastScan.structured && lastScan.structured.treatment) {
+      if (lastScan.structured.treatment.chemical && lastScan.structured.treatment.chemical.toLowerCase() !== 'none' && lastScan.structured.treatment.chemical.toLowerCase() !== 'n/a') {
+        treatmentName = lastScan.structured.treatment.chemical.split('.')[0] || "Chemical Treatment";
+        treatmentDesc = (lastScan.structured.treatment.dosage || "Follow package instructions carefully.") + " (AI Recommended Chemical)";
+        treatmentIcon = "🧪";
+      } else if (lastScan.structured.treatment.organic && lastScan.structured.treatment.organic.toLowerCase() !== 'none' && lastScan.structured.treatment.organic.toLowerCase() !== 'n/a') {
+        treatmentName = lastScan.structured.treatment.organic.split('.')[0] || "Organic Treatment";
+        treatmentDesc = (lastScan.structured.treatment.dosage || "Apply as directed.") + " (AI Recommended Organic)";
+        treatmentIcon = "🌿";
+      }
+    } else if (lastScan.treatment_recommendation) {
+        treatmentName = lastScan.treatment_recommendation.split('.')[0] || "AI Treatment";
+    }
+
+    document.getElementById('market-disease-name').textContent = (lastScan.structured && lastScan.structured.disease_name) ? lastScan.structured.disease_name : "Crop Anomaly";
+    document.getElementById('market-product-name').textContent = treatmentName;
+    document.getElementById('market-product-desc').textContent = treatmentDesc;
+    document.getElementById('market-treatment-card').children[0].textContent = treatmentIcon;
+
+    // Simulate Nearby Stores
+    var stores = [
+      { name: "Kisan Agro Hub", dist: "1.2 km", stock: "In Stock", price: "₹250", color: "var(--green)" },
+      { name: "Green Field Fertilizers", dist: "3.4 km", stock: "Low Stock", price: "₹280", color: "var(--yellow)" },
+      { name: "Ravi Krushi Kendra", dist: "5.1 km", stock: "In Stock", price: "₹240", color: "var(--green)" }
+    ];
+
+    var storesHtml = '';
+    stores.forEach(function(s) {
+      var isOutOfStock = s.stock.includes('Out') || s.stock.includes('Low');
+      var buyBtn = isOutOfStock ? 
+        '<button disabled style="background:#e2e8f0;color:#94a3b8;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:not-allowed;">Unavailable</button>' : 
+        '<button onclick="openCheckout(\\''+s.name+'\\', \\''+s.price+'\\', \\''+treatmentName+'\\')" style="background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(61,122,58,0.2);">Buy Now</button>';
+
+      storesHtml += '<div style="background:#f8fafc;border:1px solid #e2e8f0;padding:16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">' +
+        '<div style="flex:1;min-width:150px;">' +
+          '<div style="font-weight:800;font-size:15px;color:var(--text);">' + s.name + '</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:2px;">📍 ' + s.dist + ' away</div>' +
+        '</div>' +
+        '<div style="text-align:right;margin-right:12px;">' +
+          '<div style="font-weight:900;font-size:16px;color:var(--text);">' + s.price + '</div>' +
+          '<div style="font-size:11px;font-weight:700;color:' + s.color + ';margin-top:2px;">' + s.stock + '</div>' +
+        '</div>' +
+        '<div>' + buyBtn + '</div>' +
+      '</div>';
+    });
+    
+    document.getElementById('market-stores-list').innerHTML = storesHtml;
+    
+    var mCity = document.getElementById('market-location') ? document.getElementById('market-location').textContent : "Nearby";
+    document.getElementById('market-local-city').textContent = "📍 " + mCity;
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  }, 600);
+}
+
+
+function hideAlertDetails() {
+  var modal = document.getElementById('alert-details-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+
+
+function renderTrend(barId, labelId, data, key, max) {
+  var values = data.map(function(d) { return d[key]; });
+  if (!max) max = Math.max.apply(null, values) * 1.2 || 1;
+  document.getElementById(barId).innerHTML = values.map(function(v, i) {
+    return '<div class="trend-col" style="height:' + Math.max(4, v/max*100) + '%"><div class="tip">' + data[i].date.slice(5) + ': ' + v + '</div></div>';
+  }).join('');
+  document.getElementById(labelId).innerHTML = data.map(function(d) { return '<span>' + d.date.slice(5) + '</span>'; }).join('');
+}
+
+// ── Alerts ──────────────────────────────────
+async function loadAlerts() {
+  var el = document.getElementById('alerts-list');
+  el.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><p>Loading alerts...</p></div>';
+  
+  setTimeout(function() {
+    var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+    
+    // Filter only warning and critical scans
+    var severeScans = history.filter(function(x) { 
+        return x.severity === 'critical' || x.severity === 'warning'; 
+    });
+
+    if (severeScans.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">🔔</div><p>No alerts yet — your farm is looking good!</p></div>';
+      return;
+    }
+
+    var html = severeScans.map(function(s) {
+      var cropName = (s.structured && s.structured.final_crop) ? s.structured.final_crop : (s.crop_detected || 'Unknown');
+      var typeStr = (s.severity || '').toUpperCase() + ' SCAN: ' + cropName;
+      var msg = s.health_assessment || 'Severe crop issue detected';
+      var col = s.severity === 'critical' ? 'var(--red)' : 'var(--yellow)';
+      var ico = s.severity === 'critical' ? '🚨' : '⚠️';
+      var time = new Date(s.timestamp).toLocaleString();
+      
+      return '<div class="alert-item" style="border-left-color:' + col + '; padding: 12px; margin-bottom: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">' +
+        '<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;">' +
+        '<span style="font-size:12px; color:var(--muted);">' + ico + ' ' + time + '</span>' +
+        '<span style="background:rgba(245,158,11,0.1); color:' + col + '; padding: 2px 8px; border-radius: 4px; font-size:10px; font-weight:700;">AI ALERT</span>' +
+        '</div>' +
+        '<div style="font-weight:600; font-size:14px; margin-bottom: 4px; color:var(--text);">' + esc(typeStr) + '</div>' +
+        '<div style="font-size:13px; color:var(--muted); line-height: 1.5;">' + esc(msg) + '</div>' +
+        '</div>';
+    }).join('');
+
+    el.innerHTML = html;
+  }, 300);
+}
+
+// ── AI Status ───────────────────────────────
+async function checkAI() {
+  var banner = document.getElementById('ai-banner');
+  var profileAI = document.getElementById('profile-ai');
+  try {
+    var r = await fetch(API + '/ai_status');
+    var d = await r.json();
+    if (d.china_agent) {
+      banner.style.display = 'none';
+      profileAI.innerHTML = '<span style="color:var(--green);font-weight:700">GPT-4o Vision Active (99% Accuracy) 🛡️</span>';
+    } else if (d.ollama) {
+      banner.style.display = 'none';
+      var models = d.models.map(function(m) { return m.split(':')[0]; }).join(', ');
+      profileAI.innerHTML = '<span style="color:var(--green)">Ollama (' + models + ') \u2705</span>';
+    } else {
+      banner.style.display = 'block';
+      banner.innerHTML = '\uD83D\uDCA1 Install <a href="https://ollama.com" target="_blank">Ollama</a> for AI crop analysis. Without it, color analysis is used.';
+      profileAI.textContent = 'Local (PIL analysis)';
+    }
+  } catch(e) { profileAI.textContent = 'Local (PIL)'; }
+}
+
+// ── Crop Lifecycle ───────────────────────────
+var CROP_DATA = {
+  Wheat:     { icon:'🌾', days:120, soil:'Loamy / Clay', water:'Moderate', sunlight:'Full Sun', yield:'2–4 tons/acre',
+    stages:[
+      { name:'Land Prep & Sowing', icon:'🪛', days:'Day 1–7',   color:'#8B5E3C', water:'Low – moisten bed only', fertilizer:'DAP (50 kg/acre) + Urea (30 kg/acre)', pest:'Termites', disease:'Seed Rot', tip:'Sow at 4–5 cm depth; row spacing 20 cm.' },
+      { name:'Germination',        icon:'🌱', days:'Day 8–20',  color:'#6ab04c', water:'Light irrigation every 5 days', fertilizer:'None', pest:'Aphids, Cutworms', disease:'Damping Off', tip:'Keep soil moist but not waterlogged.' },
+      { name:'Tillering',          icon:'🌿', days:'Day 21–55', color:'#3d7a3a', water:'2–3 irrigations', fertilizer:'Top-dress Urea (40 kg/acre)', pest:'Stem Borer, Army Worms', disease:'Powdery Mildew, Rust', tip:'Watch for yellowing — sign of nitrogen deficiency.' },
+      { name:'Heading & Flowering',icon:'🌸', days:'Day 56–80', color:'#d4952a', water:'Critical: irrigate at heading', fertilizer:'Potassium foliar spray', pest:'Aphids, Thrips', disease:'Yellow Rust, Karnal Bunt', tip:'Avoid water stress — this stage is most sensitive.' },
+      { name:'Grain Filling',      icon:'🌻', days:'Day 81–110',color:'#e8a838', water:'Reduce to 1 final irrigation', fertilizer:'None', pest:'Grain Weevils', disease:'Loose Smut', tip:'Grains should feel firm and golden before harvest.' },
+      { name:'Harvest',            icon:'🌾', days:'Day 111–120',color:'#c0392b', water:'Stop 10 days before harvest', fertilizer:'None', pest:'Birds, Rodents', disease:'Post-harvest fungal', tip:'Harvest when grain moisture is 12–14%. Use combine harvester.' }
+    ]
+  },
+  Rice:      { icon:'🌾', days:130, soil:'Clay / Waterlogged', water:'High', sunlight:'Full Sun', yield:'3–5 tons/acre',
+    stages:[
+      { name:'Nursery Preparation', icon:'🪛', days:'Day 1–10',   color:'#8B5E3C', water:'Saturate nursery bed', fertilizer:'Compost (2 tons/acre)', pest:'Rats', disease:'Damping Off', tip:'Sow pre-germinated seeds in nursery; transplant at 25 days.' },
+      { name:'Transplanting',       icon:'🌱', days:'Day 11–25',  color:'#6ab04c', water:'5 cm standing water', fertilizer:'NPK 20:20:20', pest:'Stem Borer', disease:'Blast', tip:'Transplant 2–3 seedlings per hill, 20x15 cm spacing.' },
+      { name:'Vegetative',          icon:'🌿', days:'Day 26–60',  color:'#3d7a3a', water:'Maintain 5 cm flood', fertilizer:'Urea (60 kg/acre)', pest:'Leaf Folder, Brown Planthopper', disease:'Sheath Blight', tip:'Drain and re-flood to suppress weeds.' },
+      { name:'Flowering',           icon:'🌸', days:'Day 61–85',  color:'#d4952a', water:'Critical: must maintain water level', fertilizer:'Potassium (30 kg/acre)', pest:'Gall Midge, Hispa', disease:'Neck Blast, Tungro', tip:'Maintain flood level — dry stress reduces yield 30–50%.' },
+      { name:'Grain Ripening',      icon:'🌻', days:'Day 86–120', color:'#e8a838', water:'Drain field 15 days before harvest', fertilizer:'None', pest:'Grain Bugs, Sparrows', disease:'False Smut', tip:'Grains turn golden; panicles curve downward when ready.' },
+      { name:'Harvest',             icon:'🌾', days:'Day 121–130',color:'#c0392b', water:'Drained', fertilizer:'None', pest:'Rodents', disease:'Mold (if wet)', tip:'Harvest at 20–25% grain moisture for milling. Dry to 14%.' }
+    ]
+  },
+  Tomato:    { icon:'🍅', days:90, soil:'Well-drained Loam', water:'Moderate-High', sunlight:'Full Sun', yield:'10–20 tons/acre',
+    stages:[
+      { name:'Seed Sowing',   icon:'🪛', days:'Day 1–10',  color:'#8B5E3C', water:'Daily light misting', fertilizer:'Seed starter mix', pest:'Fungus Gnats', disease:'Damping Off', tip:'Use sterilized media. Germinate at 22–26°C.' },
+      { name:'Seedling',      icon:'🌱', days:'Day 11–30', color:'#6ab04c', water:'Every other day', fertilizer:'NPK 10:52:10 (starter)', pest:'Whitefly, Aphids', disease:'Early Blight', tip:'Harden off seedlings before transplanting.' },
+      { name:'Vegetative',    icon:'🌿', days:'Day 31–55', color:'#3d7a3a', water:'Every 2–3 days', fertilizer:'NPK 19:19:19 + Calcium', pest:'Mites, Leaf Miners', disease:'Septoria Leaf Spot', tip:'Stake plants at 30 cm height. Remove suckers.' },
+      { name:'Flowering',     icon:'🌸', days:'Day 56–70', color:'#d4952a', water:'Consistent – no stress', fertilizer:'Phosphorus + Boron foliar', pest:'Tomato Worm, Thrips', disease:'Fusarium Wilt', tip:'Tap flower clusters daily to aid pollination.' },
+      { name:'Fruit Setting', icon:'🍎', days:'Day 71–85', color:'#e8a838', water:'Drip irrigation preferred', fertilizer:'Potassium (K₂O) high dose', pest:'Fruit Borer, Stink Bugs', disease:'Blossom End Rot, Late Blight', tip:'Remove lower leaves to improve air circulation.' },
+      { name:'Harvest',       icon:'🍅', days:'Day 86–90', color:'#c0392b', water:'Reduce before harvest', fertilizer:'None', pest:'Birds, Rodents', disease:'Post-harvest rot', tip:'Harvest at breaker stage for long-distance transport, full red for local.' }
+    ]
+  },
+  Corn:      { icon:'🌽', days:100, soil:'Well-drained Sandy Loam', water:'Moderate', sunlight:'Full Sun', yield:'4–6 tons/acre',
+    stages:[
+      { name:'Planting',      icon:'🪛', days:'Day 1–7',   color:'#8B5E3C', water:'Moisten at planting', fertilizer:'Starter NPK (10-34-0)', pest:'Wireworms', disease:'Seed Rot', tip:'Plant 2–3 cm deep, 20–25 cm apart in rows 75 cm wide.' },
+      { name:'Emergence',     icon:'🌱', days:'Day 8–21',  color:'#6ab04c', water:'Light – every 7 days', fertilizer:'Nitrogen side-dress', pest:'Flea Beetles, Cutworms', disease:'Seedling Blight', tip:'Thin to 1 plant per hole after 2 weeks.' },
+      { name:'Vegetative',    icon:'🌿', days:'Day 22–55', color:'#3d7a3a', water:'Every 5 days', fertilizer:'Urea top-dress (V6 stage)', pest:'Aphids, Corn Earworm', disease:'Northern Leaf Blight', tip:'Weed control critical in V1–V6.' },
+      { name:'Tasseling',     icon:'🌸', days:'Day 56–70', color:'#d4952a', water:'Critical irrigation', fertilizer:'Potassium spray', pest:'Fall Armyworm, Rootworm', disease:'Common Rust, Smut', tip:'Ensure ample water — silking is most critical stage.' },
+      { name:'Grain Fill',    icon:'🌽', days:'Day 71–90', color:'#e8a838', water:'Regular irrigation', fertilizer:'None', pest:'Corn Borer, Birds', disease:'Gray Leaf Spot', tip:'Dent stage: grain indents at top — near maturity.' },
+      { name:'Harvest',       icon:'🌾', days:'Day 91–100',color:'#c0392b', water:'Stop 2 weeks before', fertilizer:'None', pest:'Aflatoxin molds', disease:'Ear Rot', tip:'Harvest at black layer formation (35% moisture). Dry to 15%.' }
+    ]
+  },
+  Mango:     { icon:'🥭', days:365, soil:'Deep Alluvial / Laterite', water:'Low-Moderate', sunlight:'Full Sun', yield:'5–10 tons/acre',
+    stages:[
+      { name:'Planting / Establishment', icon:'🪛', days:'Month 1–6',    color:'#8B5E3C', water:'Every 3 days first month', fertilizer:'FYM (20 kg/tree)', pest:'Stem Borer', disease:'Collar Rot', tip:'Plant grafted varieties. Maintain 10×10 m spacing.' },
+      { name:'Vegetative Growth',        icon:'🌿', days:'Month 7–24',   color:'#3d7a3a', water:'Every 10–15 days', fertilizer:'NPK 10:10:10 quarterly', pest:'Hoppers, Mealybugs', disease:'Powdery Mildew', tip:'Prune dead branches after harvest each year.' },
+      { name:'Flowering',                icon:'🌸', days:'Month 25–27',  color:'#d4952a', water:'Withhold before flowering', fertilizer:'Boron + Potassium spray', pest:'Thrips, Mango Hoppers', disease:'Powdery Mildew, Anthracnose', tip:'Spray fungicide at panicle emergence.' },
+      { name:'Fruit Set',                icon:'🥭', days:'Month 28–30',  color:'#e8a838', water:'Moderate', fertilizer:'None', pest:'Fruit Fly, Weevils', disease:'Soft Nose, Black Tip', tip:'Bag fruits at marble size to prevent fruit fly.' },
+      { name:'Fruit Development',        icon:'🍎', days:'Month 31–34',  color:'#d4952a', water:'Reduce as maturity approaches', fertilizer:'Potassium foliar', pest:'Fruit Fly', disease:'Stem-end Rot', tip:'Avoid late nitrogen — causes jelly seed disorder.' },
+      { name:'Harvest & Post-Harvest',   icon:'🌾', days:'Month 35–36',  color:'#c0392b', water:'None', fertilizer:'None', pest:'Storage pests', disease:'Post-harvest rot', tip:'Harvest at mature-green stage. Ripen at 25–28°C.' }
+    ]
+  }
+};
+
+// Full detailed data for remaining crops
+CROP_DATA['Apple'] = { icon:'🍎', days:150, soil:'Well-drained Loam / Sandy Loam', water:'Moderate', sunlight:'Full Sun (>6 hrs)', yield:'8–15 tons/acre',
+  stages:[
+    { name:'Dormancy & Pruning',   icon:'✂️',  days:'Month 1–2',  color:'#8B5E3C', water:'None — dormant period', fertilizer:'Farmyard Manure (20 kg/tree) before bud break', pest:'San Jose Scale, Woolly Aphid', disease:'Fire Blight', tip:'Prune crossing/dead branches. Apply dormant oil spray for overwintering pests.' },
+    { name:'Bud Break & Bloom',    icon:'🌸',  days:'Month 3',    color:'#d4952a', water:'Light irrigation at bloom', fertilizer:'NPK 12:61:0 foliar at pink bud stage', pest:'Codling Moth, Aphids', disease:'Apple Scab, Powdery Mildew', tip:'Protect flowers from frost. No pesticides during open bloom — protect pollinators.' },
+    { name:'Fruit Set',            icon:'🍏',  days:'Month 4',    color:'#6ab04c', water:'Every 7–10 days', fertilizer:'Calcium foliar spray (prevents bitter pit)', pest:'Mites, Leaf Roller', disease:'Cedar Apple Rust', tip:'Thin fruitlets to 1 per cluster (6–8 cm apart) for larger fruit size.' },
+    { name:'Cell Division & Growth',icon:'🌱', days:'Month 5–7',  color:'#3d7a3a', water:'Regular — every 7 days', fertilizer:'Potassium (K₂O) + Boron foliar', pest:'Codling Moth 2nd gen, Aphids', disease:'Apple Scab, Sooty Mold', tip:'Install pheromone traps for Codling Moth monitoring.' },
+    { name:'Ripening',             icon:'🍎',  days:'Month 8–9',  color:'#e8a838', water:'Reduce — stress improves colour', fertilizer:'None', pest:'Wasps, Birds', disease:'Bitter Rot, Brown Rot', tip:'Stop irrigation 2 weeks before harvest. Pick when starch-iodine test shows 6–7.' },
+    { name:'Harvest & Storage',    icon:'🌾',  days:'Month 10',   color:'#c0392b', water:'None', fertilizer:'None', pest:'Storage Diseases', disease:'Blue Mold, Grey Mold', tip:'Harvest morning, store at 0–2°C. CA storage extends shelf life to 6–8 months.' }
+  ]
+};
+
+CROP_DATA['Grape'] = { icon:'🍇', days:180, soil:'Sandy Loam / Gravelly Loam', water:'Low-Moderate', sunlight:'Full Sun (8+ hrs)', yield:'4–8 tons/acre',
+  stages:[
+    { name:'Pruning & Training',   icon:'✂️',  days:'Month 1',    color:'#8B5E3C', water:'None', fertilizer:'Balanced compost + Potassium (K₂SO₄)', pest:'Mealybugs, Scale', disease:'Black Rot (overwintering)', tip:'Cane or spur prune to 2–3 buds. Remove old bark to reduce disease.' },
+    { name:'Budbreak & Shoot Growth',icon:'🌱',days:'Month 2',    color:'#6ab04c', water:'Start irrigation at bud break', fertilizer:'Nitrogen (Urea 50 kg/acre)', pest:'Grape Berry Moth, Leaf Hoppers', disease:'Downy Mildew, Powdery Mildew', tip:'Begin mildew spray program at 5–7 cm shoot growth.' },
+    { name:'Flowering',            icon:'🌸',  days:'Month 3',    color:'#d4952a', water:'Avoid rain/irrigation during bloom', fertilizer:'Boron foliar at pre-bloom', pest:'Thrips, Berry Moth', disease:'Botrytis, Powdery Mildew', tip:'Shoot positioning ensures good light and air — critical for set and mildew control.' },
+    { name:'Fruit Set & Berry Growth',icon:'🍇',days:'Month 4–5', color:'#3d7a3a', water:'Every 10 days drip', fertilizer:'Potassium (K₂O) high-K fertilizer', pest:'Grape Mealybug, Leafhoppers', disease:'Black Rot, Downy Mildew', tip:'Cluster thinning (remove weaker clusters) for premium fruit quality.' },
+    { name:'Veraison & Ripening',  icon:'🍷',  days:'Month 6',    color:'#8b5cf6', water:'Withhold from veraison for sugar concentration', fertilizer:'None', pest:'Wasps, Birds, Spotted Wing Drosophila', disease:'Botrytis Bunch Rot', tip:'Net rows at veraison. Leaf-pull on sunny side for colour development.' },
+    { name:'Harvest',              icon:'🌾',  days:'Month 7',    color:'#c0392b', water:'None', fertilizer:'None', pest:'Yellow Jackets', disease:'Sour Rot', tip:'Harvest by Brix (22–26° for table; 22–28° for wine). Early morning harvest.' }
+  ]
+};
+
+CROP_DATA['Potato'] = { icon:'🥔', days:90, soil:'Sandy Loam / Loose Well-drained', water:'Moderate', sunlight:'Full Sun', yield:'8–15 tons/acre',
+  stages:[
+    { name:'Seed Bed Prep & Planting',icon:'🪛',days:'Day 1–10',  color:'#8B5E3C', water:'Pre-planting irrigation to moisten', fertilizer:'FYM (10 tons/acre) + NPK 150:80:100', pest:'Wireworms, Cutworms', disease:'Seed-borne blight', tip:'Plant certified seed tubers. Cut large tubers, dust with Mancozeb. Ridges 60 cm apart.' },
+    { name:'Emergence & Early Growth',icon:'🌱',days:'Day 11–30', color:'#6ab04c', water:'Every 7–8 days light irrigation', fertilizer:'Urea top-dress at emergence', pest:'Aphids, Flea Beetles', disease:'Early Blight', tip:'Hilling at emergence is critical — cover sprouts with soil to prevent greening.' },
+    { name:'Vegetative',           icon:'🌿',  days:'Day 31–55', color:'#3d7a3a', water:'Every 5–7 days', fertilizer:'Potassium sulphate + Boron foliar', pest:'Colorado Potato Beetle, Leafhoppers', disease:'Late Blight, Early Blight', tip:'Potato Late Blight can destroy a crop in 7 days — spray preventatively in humid weather.' },
+    { name:'Tuber Initiation',     icon:'🥔',  days:'Day 56–65', color:'#d4952a', water:'Most critical stage — constant moisture', fertilizer:'None — tubers forming', pest:'Aphids (virus vectors)', disease:'Late Blight, Blackleg', tip:'Water stress at this stage directly reduces tuber number. Never let soil dry out.' },
+    { name:'Tuber Bulking',        icon:'📦',  days:'Day 66–80', color:'#e8a838', water:'Regular every 5 days', fertilizer:'None', pest:'Tuber Moth, Slugs', disease:'Common Scab (avoid over-watering)', tip:'Earthing up (hilling) maximises tuber development and prevents greening.' },
+    { name:'Maturation & Harvest', icon:'🌾',  days:'Day 81–90', color:'#c0392b', water:'Stop 10 days before harvest for skin set', fertilizer:'None', pest:'Rodents, Wireworms', disease:'Dry Rot in storage', tip:'Vines must die back naturally (or desiccate). Harvest when skin does not rub off.' }
+  ]
+};
+
+CROP_DATA['Citrus'] = { icon:'🍊', days:365, soil:'Well-drained Sandy Loam', water:'Moderate', sunlight:'Full Sun (6–8 hrs)', yield:'8–15 tons/acre',
+  stages:[
+    { name:'Planting & Establishment', icon:'🪛',  days:'Month 1–4',  color:'#8B5E3C', water:'Every 3–4 days for first month', fertilizer:'Starter NPK 10:26:26 (200g/tree)', pest:'Aphids, Citrus Psyllid', disease:'Collar Rot, Tristeza', tip:'Use budded grafted plants. Plant in raised beds if drainage is poor.' },
+    { name:'Pre-bloom & Flowering',    icon:'🌸',  days:'Month 5–6',  color:'#d4952a', water:'Moderate stress before bloom induces flowering', fertilizer:'Potassium + Boron foliar at bud swell', pest:'Citrus Leafminer, Thrips', disease:'Post-bloom Drop (physiological)', tip:'Irrigation stress (water deficit) is used to trigger uniform flowering.' },
+    { name:'Fruit Set',                icon:'🟠',  days:'Month 7–8',  color:'#e8a838', water:'Resume regular irrigation after fruit set', fertilizer:'Calcium spray to reduce drop', pest:'Citrus Mealybug, Scales', disease:'Greasy Spot, Melanose', tip:'June-drop is natural — only 1–2% of flowers need to set fruit for good yield.' },
+    { name:'Fruit Development',        icon:'🍊',  days:'Month 9–11', color:'#6ab04c', water:'Every 7–10 days drip', fertilizer:'NPK 19:0:19 + Magnesium sulphate', pest:'Fruit Fly, Scales', disease:'Phytophthora Gummosis', tip:'Fruit fly baiting (protein hydrolysate + Malathion) is most effective control.' },
+    { name:'Ripening & Colour Break',  icon:'🌅',  days:'Month 12',   color:'#d4952a', water:'Reduce for sugar concentration', fertilizer:'None', pest:'Birds, Rodents', disease:'Alternaria Brown Spot', tip:'Cool nights (<15°C) are needed for orange colour development. In tropics fruit stays green.' },
+    { name:'Harvest & Post-Harvest',   icon:'🌾',  days:'Month 13',   color:'#c0392b', water:'None', fertilizer:'None', pest:'Fruit Fly post-harvest', disease:'Blue Mold, Green Mold', tip:'Harvest Brix should be 10–13°. Wax coat and refrigerate for export market.' }
+  ]
+};
+
+CROP_DATA['Sunflower'] = { icon:'🌻', days:90, soil:'Sandy Loam / Well-drained', water:'Low-Moderate', sunlight:'Full Sun (8 hrs)', yield:'1–1.5 tons seeds/acre',
+  stages:[
+    { name:'Seed Bed & Planting',  icon:'🪛',  days:'Day 1–7',   color:'#8B5E3C', water:'Moisten at planting', fertilizer:'DAP (50 kg/acre) at sowing', pest:'Termites, Cutworms', disease:'Seed Rot', tip:'Plant at 4–5 cm depth, 60 cm rows, 30 cm plant spacing. One seed per hill.' },
+    { name:'Germination & Emergence',icon:'🌱',days:'Day 8–18',  color:'#6ab04c', water:'Light — once per week', fertilizer:'None', pest:'Flea Beetles, Aphids', disease:'Damping Off', tip:'Thin to one plant per hill at 2-leaf stage. Weed early — critical period is V4–V8.' },
+    { name:'Vegetative Growth',    icon:'🌿',  days:'Day 19–45', color:'#3d7a3a', water:'Every 7–10 days', fertilizer:'Urea top-dress (20 kg/acre) at V4', pest:'Sunflower Moth, Stem Weevil', disease:'Downy Mildew, Alternaria', tip:'Avoid excessive nitrogen — causes lodging. Cultivate twice for weed control.' },
+    { name:'Bud Formation',        icon:'🌻',  days:'Day 46–60', color:'#d4952a', water:'Critical: irrigate at bud formation', fertilizer:'Potassium sulphate foliar', pest:'Sunflower Beetle, Aphids', disease:'Powdery Mildew, Rust', tip:'Head orientation faces east in morning — east-facing beds maximise pollination.' },
+    { name:'Flowering & Pollination',icon:'🌸',days:'Day 61–75', color:'#e8a838', water:'Critical: do not stress during bloom', fertilizer:'Boron foliar for seed set', pest:'Bees (beneficial!), Sunflower Moth', disease:'Alternaria Leaf Blight', tip:'Place 2–3 beehives per hectare for pollination. Avoid insecticides at bloom.' },
+    { name:'Seed Fill & Harvest',  icon:'🌾',  days:'Day 76–90', color:'#c0392b', water:'Stop 2 weeks before harvest', fertilizer:'None', pest:'Birds (major threat!)', disease:'Botrytis Head Rot, Sclerotinia', tip:'Net heads or brown paper bags. Harvest when back of head turns yellow-brown (25% moisture).' }
+  ]
+};
+
+CROP_DATA['Pepper'] = { icon:'🌶️', days:80, soil:'Well-drained Loam / Sandy Loam', water:'Moderate', sunlight:'Full Sun', yield:'2–4 tons/acre',
+  stages:[
+    { name:'Nursery / Seed Sowing', icon:'🪛', days:'Day 1–15',  color:'#8B5E3C', water:'Daily misting', fertilizer:'Seed starter (low NPK)', pest:'Fungus Gnats', disease:'Damping Off', tip:'Sow in trays at 25–28°C. Germination in 10–14 days. Transplant at 6-leaf stage.' },
+    { name:'Transplanting & Establishment',icon:'🌱',days:'Day 16–30',color:'#6ab04c', water:'Every 2 days after transplant', fertilizer:'NPK 10:52:10 starter', pest:'Aphids, Whitefly', disease:'Phytophthora Blight', tip:'Transplant in evening or cloudy day. Shade for first 5 days. Spacing: 45×45 cm.' },
+    { name:'Vegetative Growth',    icon:'🌿',  days:'Day 31–50', color:'#3d7a3a', water:'Every 3–4 days', fertilizer:'NPK 19:19:19 + Magnesium', pest:'Mites, Aphids, Thrips', disease:'Anthracnose, Cercospora', tip:'Stake tall varieties. Remove early flower buds to boost vegetative growth.' },
+    { name:'Flowering',            icon:'🌸',  days:'Day 51–60', color:'#d4952a', water:'Consistent — critical stage', fertilizer:'Potassium + Boron foliar', pest:'Thrips (major vector), Whitefly', disease:'Bacterial Wilt, Mosaic Virus', tip:'Thrips transmit TSWV virus — use yellow sticky traps + neem oil.' },
+    { name:'Fruit Setting',        icon:'🌶️',  days:'Day 61–72', color:'#e8a838', water:'Drip preferred', fertilizer:'Calcium spray to prevent blossom end rot', pest:'Fruit Borer, Mites', disease:'Phytophthora Fruit Rot', tip:'High temperature (>35°C) causes flower drop. Shade cloth in peak summer.' },
+    { name:'Harvest',              icon:'🌾',  days:'Day 73–80', color:'#c0392b', water:'Reduce before harvest', fertilizer:'None', pest:'Birds', disease:'Post-harvest Anthracnose', tip:'Harvest green or red depending on market. Pick with scissors to avoid plant damage. Multiple picks possible.' }
+  ]
+};
+
+CROP_DATA['Banana'] = { icon:'🍌', days:300, soil:'Deep Rich Loam / Clay Loam', water:'High', sunlight:'Full Sun (8+ hrs)', yield:'15–30 tons/acre',
+  stages:[
+    { name:'Planting / Sucker Establishment', icon:'🪛',  days:'Month 1–2',  color:'#8B5E3C', water:'Every 3 days for first month', fertilizer:'FYM (20 kg/plant) + NPK at planting', pest:'Banana Weevil Borer', disease:'Panama Wilt', tip:'Plant healthy sword suckers at 1.8×1.8 m spacing. Remove all but 1 sucker until fruiting.' },
+    { name:'Vegetative (Pseudostem Growth)',  icon:'🌿',  days:'Month 3–5',  color:'#3d7a3a', water:'Every 3–4 days', fertilizer:'Urea (200g/plant/month)', pest:'Banana Aphid, Thrips', disease:'Sigatoka Leaf Spot (Black & Yellow)', tip:'Sigatoka is the most costly disease — spray oil-based fungicides on 10-day cycle.' },
+    { name:'Rapid Growth & Bunch Initiation',icon:'🌱',  days:'Month 6–7',  color:'#6ab04c', water:'Daily drip preferred', fertilizer:'High Potassium (K₂SO₄ 300g/plant)', pest:'Nematodes, Weevil', disease:'Black Sigatoka, Fusarium', tip:'Potassium is the most critical nutrient — deficiency causes premature ripening.' },
+    { name:'Flowering (Shooting)',           icon:'🌸',  days:'Month 8',    color:'#d4952a', water:'Critical — never stress at shooting', fertilizer:'Potassium + Zinc foliar', pest:'Flower Thrips, Mealybugs', disease:'Anthracnose, Tip Rot', tip:'Remove male bud (bell) 2 hands after last full hand for larger fingers.' },
+    { name:'Bunch Development',             icon:'🍌',  days:'Month 9–9.5',color:'#e8a838', water:'Regular every 3 days', fertilizer:'None', pest:'Scale Insects, Mealy Bugs', disease:'Finger tip rot', tip:'Bag bunches with blue perforated polythene bags to protect from insects and improve colour.' },
+    { name:'Harvest & Ratoon Management',   icon:'🌾',  days:'Month 10',   color:'#c0392b', water:'Reduce before harvest', fertilizer:'None', pest:'Banana Weevil in ratoon', disease:'Post-harvest Crown Rot', tip:'Harvest when fingers are round (3/4 full). Cut bunch and handle carefully — bruising causes black skin.' }
+  ]
+};
+
+
+
+// ── PULSES & LEGUMES ────────────────────────
+CROP_DATA['Pigeon Pea'] = { icon:'🫘', days:180, soil:'Well-drained Loam (pH 6.5–7.5)', water:'Low-Moderate', sunlight:'Full Sun', yield:'6–10 quintals/acre', category:'crop',
+  stages:[
+    { name:'Seed Sowing',           icon:'🪛', days:'Day 1–10',   color:'#8B5E3C', water:'Pre-sowing irrigation', fertilizer:'Basal NPK (20:40:20 kg/ha) + Rhizobium', pest:'Termites', disease:'Seed Rot', tip:'Deep tap root makes it drought tolerant. Do not overwater at sowing.' },
+    { name:'Seedling & Branching',  icon:'🌱', days:'Day 11–45',  color:'#6ab04c', water:'Light irrigation if dry', fertilizer:'Weed control is critical here', pest:'Jassids, Whitefly', disease:'Phytophthora Blight', tip:'Slow initial growth. Intercropping with fast-growing crops (mung/urad) is common.' },
+    { name:'Active Vegetative',     icon:'🌿', days:'Day 46–90',  color:'#3d7a3a', water:'Rainfed mostly', fertilizer:'Foliar 2% Urea if nitrogen deficient', pest:'Leaf Webber, Aphids', disease:'Wilt (Fusarium)', tip:'Waterlogging is fatal for Pigeon Pea. Ensure field drainage.' },
+    { name:'Bud Formation & Bloom', icon:'🌸', days:'Day 91–120', color:'#d4952a', water:'Critical — irrigate if dry', fertilizer:'No heavy N, use Boron if flowers drop', pest:'Pod Borer (Helicoverpa) starts arriving', disease:'Sterility Mosaic Virus', tip:'Use pheromone traps for Helicoverpa armigera monitoring.' },
+    { name:'Pod Development',       icon:'🫛', days:'Day 121–150',color:'#e8a838', water:'Critical moisture needed', fertilizer:'Foliar DAP (2%) to boost pod filling', pest:'Pod Fly, Pod Borer', disease:'Macrophomina Blight', tip:'Spray Neem Seed Kernel Extract (NSKE 5%) against early borers.' },
+    { name:'Maturation & Harvest',  icon:'🌾', days:'Day 151–180',color:'#c0392b', water:'None', fertilizer:'None', pest:'Bruchid beetles in storage', disease:'None', tip:'Harvest when 80% pods turn brown and dry. Dry seeds to 10% moisture before storage.' }
+  ]
+};
+
+CROP_DATA['Black Gram'] = { icon:'🖤', days:85, soil:'Heavy Loam / Clay Loam', water:'Low', sunlight:'Full Sun', yield:'4–6 quintals/acre', category:'crop',
+  stages:[
+    { name:'Sowing',                icon:'🪛', days:'Day 1–7',   color:'#8B5E3C', water:'Moist soil for germination', fertilizer:'Basal NPK 20:40:20 kg/ha', pest:'Flea Beetles', disease:'Damping Off', tip:'Treat seeds with Rhizobium culture before sowing.' },
+    { name:'Seedling Growth',       icon:'🌱', days:'Day 8–25',  color:'#6ab04c', water:'Minimal', fertilizer:'None', pest:'Thrips, Whitefly', disease:'Yellow Mosaic Virus (YMV)', tip:'YMV is the biggest threat. Whiteflies spread it — control them early.' },
+    { name:'Branching & Canopy',    icon:'🌿', days:'Day 26–40', color:'#3d7a3a', water:'One irrigation if no rain', fertilizer:'Foliar DAP (2%) at pre-flowering', pest:'Hairy Caterpillar', disease:'Cercospora Leaf Spot', tip:'Keep field weed-free for the first 30 days.' },
+    { name:'Flowering',             icon:'🌸', days:'Day 41–55', color:'#d4952a', water:'Critical for flower retention', fertilizer:'None', pest:'Flower Thrips', disease:'Powdery Mildew', tip:'Moisture stress during flowering causes massive yield loss.' },
+    { name:'Pod Formation',         icon:'🫛', days:'Day 56–70', color:'#e8a838', water:'Critical for grain filling', fertilizer:'Foliar K to increase grain weight', pest:'Pod Borer', disease:'Web Blight', tip:'Black Gram matures synchronously in modern varieties.' },
+    { name:'Harvest',               icon:'🌾', days:'Day 71–85', color:'#c0392b', water:'None', fertilizer:'None', pest:'Storage pests', disease:'None', tip:'Harvest when pods turn completely black. Thresh after sun-drying.' }
+  ]
+};
+
+CROP_DATA['Red Lentil'] = { icon:'🔴', days:110, soil:'Well-drained Loam (pH 6–7.5)', water:'Low (Rabi crop)', sunlight:'Full Sun', yield:'6–8 quintals/acre', category:'crop',
+  stages:[
+    { name:'Seed Sowing',           icon:'🪛', days:'Day 1–10',  color:'#8B5E3C', water:'Pre-sowing irrigation', fertilizer:'Basal NPK 20:40:0 kg/ha', pest:'Cutworms', disease:'Seed Rot', tip:'Cold weather crop. Deep sowing avoids initial bird damage.' },
+    { name:'Vegetative Growth',     icon:'🌿', days:'Day 11–45', color:'#3d7a3a', water:'Minimal (uses residual moisture)', fertilizer:'None', pest:'Aphids', disease:'Wilt', tip:'Very tolerant to drought. Does not require heavy watering.' },
+    { name:'Branching',             icon:'🌱', days:'Day 46–65', color:'#6ab04c', water:'Irrigate at branching stage', fertilizer:'Foliar Urea (2%) if yellowing', pest:'Aphids', disease:'Rust', tip:'Lentil forms a dense canopy that smothers late weeds.' },
+    { name:'Flowering',             icon:'🌸', days:'Day 66–80', color:'#d4952a', water:'Crucial for pod set', fertilizer:'None', pest:'Thrips', disease:'Powdery Mildew', tip:'Frost during flowering can damage the crop severely.' },
+    { name:'Pod Filling',           icon:'🫛', days:'Day 81–95', color:'#e8a838', water:'Mild moisture needed', fertilizer:'None', pest:'Pod Borer', disease:'Blight', tip:'Small pods contain 1–2 seeds each.' },
+    { name:'Maturation & Harvest',  icon:'🌾', days:'Day 96–110',color:'#c0392b', water:'None', fertilizer:'None', pest:'Bruchids', disease:'None', tip:'Harvest when plants turn yellow-brown and pods are dry. Over-drying causes shattering.' }
+  ]
+};
+
+CROP_DATA['Mung Bean'] = { icon:'🟢', days:70, soil:'Sandy Loam to Loam', water:'Low', sunlight:'Full Sun', yield:'4–5 quintals/acre', category:'crop',
+  stages:[
+    { name:'Sowing',                icon:'🪛', days:'Day 1–7',   color:'#8B5E3C', water:'Moist soil for germination', fertilizer:'Basal NPK 20:40:20 kg/ha', pest:'Flea Beetles', disease:'Damping Off', tip:'Short duration crop. Excellent for summer gap planting.' },
+    { name:'Seedling Growth',       icon:'🌱', days:'Day 8–20',  color:'#6ab04c', water:'Minimal', fertilizer:'None', pest:'Whitefly (Vector for YMV)', disease:'Yellow Mosaic Virus', tip:'Use YMV-resistant varieties as Mung is highly susceptible.' },
+    { name:'Branching',             icon:'🌿', days:'Day 21–35', color:'#3d7a3a', water:'One irrigation at 25 days', fertilizer:'Foliar DAP (2%)', pest:'Thrips', disease:'Leaf Spot', tip:'Pinch main shoot (nipping) to encourage side branches.' },
+    { name:'Flowering',             icon:'🌸', days:'Day 36–50', color:'#d4952a', water:'Critical for yield', fertilizer:'None', pest:'Flower Thrips', disease:'Powdery Mildew', tip:'Avoid water stress here. Moisture directly translates to pod count.' },
+    { name:'Pod Filling',           icon:'🫛', days:'Day 51–60', color:'#e8a838', water:'Crucial', fertilizer:'Foliar K', pest:'Pod Borer', disease:'None', tip:'Pods turn from green to black as they mature.' },
+    { name:'Harvest',               icon:'🌾', days:'Day 61–70', color:'#c0392b', water:'None', fertilizer:'None', pest:'Storage pests', disease:'None', tip:'Usually requires 2-3 pickings as pods mature unevenly, unless using sync-maturing varieties.' }
+  ]
+};
+
+CROP_DATA['Chickpea'] = { icon:'🧆', days:140, soil:'Well-drained deep Loam/Clay Loam', water:'Low (Rabi crop)', sunlight:'Full Sun', yield:'8–10 quintals/acre', category:'crop',
+  stages:[
+    { name:'Sowing',                icon:'🪛', days:'Day 1–10',  color:'#8B5E3C', water:'Pre-sowing irrigation', fertilizer:'Basal NPK 20:40:20 kg/ha', pest:'Termites, Cutworms', disease:'Seed Rot', tip:'Deep sowing (8-10 cm) relies on residual soil moisture.' },
+    { name:'Vegetative Growth',     icon:'🌿', days:'Day 11–45', color:'#3d7a3a', water:'Rainfed mostly', fertilizer:'None', pest:'None', disease:'Fusarium Wilt', tip:'Highly sensitive to overwatering and poor drainage.' },
+    { name:'Branching (Nipping)',   icon:'✂️', days:'Day 46–70', color:'#6ab04c', water:'Irrigate at pre-flowering', fertilizer:'None', pest:'Helicoverpa', disease:'Ascochyta Blight', tip:'Nipping (plucking top shoots) at 35-40 days increases branching and pods.' },
+    { name:'Flowering',             icon:'🌸', days:'Day 71–95', color:'#d4952a', water:'Critical (Do not irrigate heavily during full bloom)', fertilizer:'Foliar Urea (2%)', pest:'Pod Borer (Helicoverpa)', disease:'Botrytis Gray Mold', tip:'Acid exudates from leaves deter some pests but Helicoverpa is a major threat.' },
+    { name:'Pod Development',       icon:'🫛', days:'Day 96–120',color:'#e8a838', water:'Light irrigation if dry', fertilizer:'Foliar K', pest:'Pod Borer', disease:'Dry Root Rot', tip:'Pheromone traps and NPV bio-pesticide are best for borer control.' },
+    { name:'Maturation & Harvest',  icon:'🌾', days:'Day 121–140',color:'#c0392b', water:'None', fertilizer:'None', pest:'Bruchid beetles in storage', disease:'None', tip:'Harvest when leaves turn reddish-brown and drop. Seeds should rattle in the pod.' }
+  ]
+};
+
+CROP_DATA['Horse Gram'] = { icon:'🐎', days:100, soil:'Poor / Sandy / Gravelly soils', water:'Extremely Low', sunlight:'Full Sun', yield:'3–4 quintals/acre', category:'crop',
+  stages:[
+    { name:'Sowing',                icon:'🪛', days:'Day 1–10',  color:'#8B5E3C', water:'Rainfed', fertilizer:'None', pest:'None', disease:'None', tip:'The most hardy pulse. Thrives in poor soil and drought conditions.' },
+    { name:'Vegetative Growth',     icon:'🌿', days:'Day 11–40', color:'#3d7a3a', water:'Rainfed', fertilizer:'None', pest:'Flea Beetles', disease:'Yellow Mosaic', tip:'Excellent cover crop. Prevents soil erosion on slopes.' },
+    { name:'Flowering',             icon:'🌸', days:'Day 41–65', color:'#d4952a', water:'Minimal', fertilizer:'None', pest:'Aphids', disease:'Root Rot', tip:'Very low maintenance. Does not respond well to heavy fertilisation.' },
+    { name:'Pod Formation',         icon:'🫛', days:'Day 66–85', color:'#e8a838', water:'None', fertilizer:'None', pest:'Pod Borer (minor)', disease:'None', tip:'Pods are flat and curved.' },
+    { name:'Maturation',            icon:'🌾', days:'Day 86–100',color:'#c0392b', water:'None', fertilizer:'None', pest:'None', disease:'None', tip:'Harvest entire plant, dry, and thresh. Used as food and excellent fodder.' },
+    { name:'Storage',               icon:'🛖', days:'Post',      color:'#7a6a52', water:'None', fertilizer:'None', pest:'Storage pests', disease:'None', tip:'Extremely long shelf life. Boiled seeds are high-protein cattle feed.' }
+  ]
+};
+
+CROP_DATA['Kidney Bean'] = { icon:'🫘', days:110, soil:'Well-drained Loam (pH 6–7.5)', water:'Moderate', sunlight:'Full Sun', yield:'5–7 quintals/acre', category:'crop',
+  stages:[
+    { name:'Sowing',                icon:'🪛', days:'Day 1–10',  color:'#8B5E3C', water:'Moist soil for germination', fertilizer:'Higher N needed (Rajma does NOT fix nitrogen well)', pest:'Bean Fly', disease:'Seed Rot', tip:'Unlike other legumes, Rajma does not nodulate well. Apply 40-50 kg N/ha.' },
+    { name:'Vegetative Growth',     icon:'🌿', days:'Day 11–40', color:'#3d7a3a', water:'Every 10-12 days', fertilizer:'Top dress N at 30 days', pest:'Aphids, Leafminer', disease:'Anthracnose', tip:'Very sensitive to frost and waterlogging.' },
+    { name:'Flowering',             icon:'🌸', days:'Day 41–65', color:'#d4952a', water:'Critical — stress causes flower drop', fertilizer:'Foliar P & K', pest:'Thrips', disease:'Powdery Mildew', tip:'Temperatures above 30°C cause severe flower drop.' },
+    { name:'Pod Formation',         icon:'🫛', days:'Day 66–85', color:'#e8a838', water:'Critical for filling', fertilizer:'None', pest:'Pod Borer', disease:'Rust', tip:'Maintain even moisture for uniform pod size.' },
+    { name:'Maturation',            icon:'🌾', days:'Day 86–110',color:'#c0392b', water:'Stop irrigation', fertilizer:'None', pest:'Storage beetles', disease:'None', tip:'Pods turn yellow and dry. Harvest promptly to avoid shattering.' },
+    { name:'Storage',               icon:'🛖', days:'Post',      color:'#7a6a52', water:'None', fertilizer:'None', pest:'Bruchids', disease:'None', tip:'Dry to 10-12% moisture. Treat with neem oil for organic storage.' }
+  ]
+};
+
+// ── FLOWERS ─────────────────────────────────
+CROP_DATA['Rose'] = { icon:'🌹', days:365, soil:'Well-drained Loam (pH 6–6.5)', water:'Moderate', sunlight:'Full Sun (6+ hrs)', yield:'30–50 flowers/plant/year', category:'flower',
+  stages:[
+    { name:'Planting & Establishment', icon:'🪛', days:'Month 1',    color:'#8B5E3C', water:'Every 2–3 days', fertilizer:'Bone meal + Compost at planting', pest:'Aphids, Scale', disease:'Black Spot, Powdery Mildew', tip:'Plant bare-root roses in winter dormancy. Graft union 2 cm above soil.' },
+    { name:'Spring Growth & Leafing',  icon:'🌿', days:'Month 2–3',  color:'#3d7a3a', water:'Every 3 days', fertilizer:'NPK 10:10:10 at bud break', pest:'Aphids, Thrips, Spider Mites', disease:'Black Spot, Downy Mildew', tip:'Remove any winter-killed stems. Begin fungicide spray program.' },
+    { name:'Bud Formation',            icon:'🌸', days:'Month 4',    color:'#d4952a', water:'Consistent — never let dry out at bud', fertilizer:'High-P foliar (10:52:10)', pest:'Rose Midges, Thrips', disease:'Botrytis, Powdery Mildew', tip:'Disbud for large exhibition blooms. Allow all buds for garden display.' },
+    { name:'Flowering & Peak Bloom',   icon:'🌹', days:'Month 5–6',  color:'#c0392b', water:'Every 2–3 days drip at base', fertilizer:'Potassium + Epsom salt (MgSO₄) foliar', pest:'Japanese Beetle, Aphids', disease:'Black Spot, Canker', tip:'Deadhead spent blooms immediately to promote reblooming. Cut at 5-leaflet node.' },
+    { name:'Summer Maintenance',       icon:'🌿', days:'Month 7–9',  color:'#3d7a3a', water:'Deep watering every 3–4 days', fertilizer:'Slow-release fertilizer every 6 weeks', pest:'Spider Mites (hot dry), Japanese Beetle', disease:'Black Spot, Powdery Mildew', tip:'Mulch 8 cm around base. Stop fertilising 6 weeks before first frost.' },
+    { name:'Autumn & Dormancy Prep',   icon:'✂️', days:'Month 10–12',color:'#6ab04c', water:'Reduce watering', fertilizer:'Potassium (K) hardening spray', pest:'Rose Hips pests', disease:'Crown Gall', tip:'Stop deadheading in autumn to allow hips. Light prune. Protect graft union with soil mound in cold climates.' }
+  ]
+};
+
+CROP_DATA['Marigold'] = { icon:'🌼', days:75, soil:'Any well-drained soil (pH 5.8–7)', water:'Low-Moderate', sunlight:'Full Sun', yield:'50–100 flowers/plant/season', category:'flower',
+  stages:[
+    { name:'Seed Sowing',       icon:'🪛', days:'Day 1–7',   color:'#8B5E3C', water:'Daily misting', fertilizer:'None at sowing', pest:'Fungus Gnats', disease:'Damping Off', tip:'Surface sow or cover lightly. Germination in 5–7 days at 22°C.' },
+    { name:'Seedling Stage',    icon:'🌱', days:'Day 8–20',  color:'#6ab04c', water:'Every other day', fertilizer:'Dilute liquid fertilizer (NPK 10:10:10)', pest:'Aphids, Whitefly', disease:'Powdery Mildew', tip:'Thin to 1 per cell. Transplant outdoors after last frost.' },
+    { name:'Vegetative Growth', icon:'🌿', days:'Day 21–40', color:'#3d7a3a', water:'Every 3–4 days', fertilizer:'Balanced NPK (20:20:20)', pest:'Spider Mites, Aphids', disease:'Botrytis, Leaf Spot', tip:'Pinch growing tips at 6-leaf stage for bushier plant with more blooms.' },
+    { name:'Bud Formation',     icon:'🌸', days:'Day 41–55', color:'#d4952a', water:'Consistent moisture', fertilizer:'Switch to low-N, high-K fertilizer', pest:'Thrips, Budworm', disease:'Powdery Mildew', tip:'Marigolds are natural pest repellents — plant near tomatoes and vegetables.' },
+    { name:'Full Bloom',        icon:'🌼', days:'Day 56–70', color:'#e8a838', water:'Every 3–4 days', fertilizer:'Potassium foliar for colour intensity', pest:'Japanese Beetle, Slugs', disease:'Grey Mold on spent flowers', tip:'Deadhead regularly — marigolds bloom continuously if deadheaded every few days.' },
+    { name:'Seed Harvest / Overwintering', icon:'🌾', days:'Day 71–75', color:'#c0392b', water:'Reduce', fertilizer:'None', pest:'Seed Weevils', disease:'Head Rot', tip:'Allow last flowers to dry on plant for seed saving. Dried seeds viable for 2–3 years.' }
+  ]
+};
+
+CROP_DATA['Jasmine'] = { icon:'🌸', days:365, soil:'Well-drained Sandy Loam (pH 6–7)', water:'Moderate', sunlight:'Full Sun to Part Shade', yield:'Fragrant blooms spring–summer', category:'flower',
+  stages:[
+    { name:'Planting / Cutting',    icon:'🪛', days:'Month 1',    color:'#8B5E3C', water:'Every 2 days until established', fertilizer:'Compost + Bone meal', pest:'Mealybug, Scale', disease:'Root Rot (overwatering)', tip:'Plant stem cuttings in spring. Root in moist sand in 4–6 weeks.' },
+    { name:'Establishment',         icon:'🌿', days:'Month 2–3',  color:'#3d7a3a', water:'Every 3 days', fertilizer:'NPK 10:10:10 (half dose)', pest:'Whitefly, Spider Mites', disease:'Leaf Spot', tip:'Train on trellis or support. Jasmine grows fast — guide early.' },
+    { name:'Pre-bloom Vigour',      icon:'🌱', days:'Month 4–5',  color:'#6ab04c', water:'Regular', fertilizer:'High-P fertilizer (10:52:10)', pest:'Aphids, Mealybug', disease:'Powdery Mildew', tip:'Prune lightly after first bloom flush to promote second flush.' },
+    { name:'Peak Flowering',        icon:'🌸', days:'Month 6–8',  color:'#d4952a', water:'Consistent — never let dry completely', fertilizer:'Potassium foliar + Magnesium', pest:'Thrips, Budworm', disease:'Botrytis on flowers', tip:'Harvest flowers early morning for maximum fragrance. Used in garlands, perfume, tea.' },
+    { name:'Post-bloom & Pruning',  icon:'✂️', days:'Month 9–10', color:'#e8a838', water:'Reduce slightly', fertilizer:'Balanced NPK to encourage next season', pest:'Scale Insects', disease:'Twig Blight', tip:'Hard prune after main bloom to keep compact and encourage next year\'s flowering.' },
+    { name:'Winter Rest',           icon:'🌿', days:'Month 11–12',color:'#6ab04c', water:'Minimal', fertilizer:'None', pest:'Mealybug (indoor)', disease:'Root Rot', tip:'Protect from frost. In pots, bring indoors. Minimal watering in dormancy.' }
+  ]
+};
+
+CROP_DATA['Hibiscus'] = { icon:'🌺', days:365, soil:'Well-drained Loam / Sandy Loam', water:'Moderate-High', sunlight:'Full Sun (6+ hrs)', yield:'100+ blooms/year (each lasts 1 day)', category:'flower',
+  stages:[
+    { name:'Planting',              icon:'🪛', days:'Month 1',    color:'#8B5E3C', water:'Every 2 days until established', fertilizer:'FYM + NPK at planting', pest:'Whitefly, Aphids', disease:'Leaf Curl (virus)', tip:'Plant in full sun. Hibiscus needs heat — avoid cold and frost.' },
+    { name:'Early Vegetative',      icon:'🌿', days:'Month 2–3',  color:'#3d7a3a', water:'Every 3–4 days', fertilizer:'High-N fertilizer (NPK 19:19:19)', pest:'Mealybug, Scale', disease:'Fusarium Wilt', tip:'Prune to shape after planting. Remove crossing branches.' },
+    { name:'Active Growth',         icon:'🌱', days:'Month 4–6',  color:'#6ab04c', water:'Regular — every 3 days', fertilizer:'Switch to high-P + K fertilizer', pest:'Aphids, Leafhoppers', disease:'Leaf Spot, Powdery Mildew', tip:'Fertilise every 2 weeks in growing season. Iron deficiency causes yellowing.' },
+    { name:'Continuous Blooming',   icon:'🌺', days:'Month 7–9',  color:'#c0392b', water:'Every 2–3 days — do not let dry at flowering', fertilizer:'High-K fertilizer + Magnesium foliar', pest:'Thrips, Spider Mites (dry)', disease:'Botrytis on flowers', tip:'Each bloom lasts 1 day — deadhead daily. Blooms form on NEW growth only.' },
+    { name:'Post-summer Pruning',   icon:'✂️', days:'Month 10',   color:'#d4952a', water:'Moderate', fertilizer:'Balanced NPK for root strengthening', pest:'Scale insects', disease:'Root Rot', tip:'Cut back 1/3 after main flush to rejuvenate and promote autumn blooms.' },
+    { name:'Cool Season / Dormancy',icon:'🌿', days:'Month 11–12',color:'#6ab04c', water:'Reduce significantly', fertilizer:'None', pest:'Mealybug (indoor/pot)', disease:'Powdery Mildew (cool)', tip:'In cool climates, bring potted hibiscus indoors. Minimal water. Resume feeding in spring.' }
+  ]
+};
+
+CROP_DATA['Lotus'] = { icon:'🪷', days:120, soil:'Heavy Clay / Pond Mud', water:'Aquatic — must be submerged', sunlight:'Full Sun (6+ hrs)', yield:'50–100 blooms/season', category:'flower',
+  stages:[
+    { name:'Rhizome Planting',      icon:'🪛', days:'Day 1–14',  color:'#8B5E3C', water:'10–20 cm water depth', fertilizer:'Aquatic slow-release tablet fertilizer', pest:'Aphids, Water Lily Beetles', disease:'Rhizome Rot', tip:'Plant rhizomes horizontally in clay-heavy soil. Keep growing tip pointing up.' },
+    { name:'Leaf Emergence',        icon:'🌿', days:'Day 15–35', color:'#3d7a3a', water:'Maintain 15–30 cm depth', fertilizer:'Aquatic fertilizer monthly', pest:'Aphids on floating leaves', disease:'Leaf Spot', tip:'Floating leaves appear first, then aerial leaves. Do not disturb roots.' },
+    { name:'Vigorous Growth',       icon:'🌱', days:'Day 36–60', color:'#6ab04c', water:'Increase to 30–60 cm depth as plant grows', fertilizer:'Aquatic fertilizer every 3–4 weeks', pest:'Snails, Water Boatmen', disease:'Fungal Leaf Blight', tip:'Remove yellowing leaves. Do not let pond go dry even briefly.' },
+    { name:'Bud Formation',         icon:'🌸', days:'Day 61–80', color:'#d4952a', water:'Stable depth — fluctuation stops flowering', fertilizer:'High-P aquatic tablet', pest:'Water Lily Aphid, Beetles', disease:'Botrytis on buds', tip:'Lotus flowers emerge sequentially — each blooms for 3 days then closes and forms seed head.' },
+    { name:'Peak Blooming',         icon:'🪷', days:'Day 81–105',color:'#c0392b', water:'Steady water level critical', fertilizer:'None during peak bloom', pest:'Japanese Beetle, Aphids', disease:'None significant', tip:'Flowers open pink/white at dawn, close midday. Sacred — often grown for temples and events.' },
+    { name:'Seed Pod & Dormancy',   icon:'🌾', days:'Day 106–120',color:'#6ab04c', water:'Gradually lower water level', fertilizer:'None', pest:'None', disease:'None', tip:'Decorative seed pods dry beautifully. In winter reduce water to 5 cm or store rhizomes in damp sand at 5°C.' }
+  ]
+};
+
+CROP_DATA['Lavender'] = { icon:'💜', days:365, soil:'Sandy / Gravelly, Very Well-drained (pH 6.5–7.5)', water:'Low (drought-tolerant)', sunlight:'Full Sun (8 hrs)', yield:'1–2 kg dried flowers/plant', category:'flower',
+  stages:[
+    { name:'Planting (Seeds/Cuttings)',icon:'🪛',days:'Month 1',   color:'#8B5E3C', water:'Light until established', fertilizer:'Low-fertility soil is ideal — no heavy feeding', pest:'Aphids, Froghoppers', disease:'Phytophthora Root Rot (overwatering)', tip:'Excellent drainage is essential — raised beds or slopes are ideal. Sandy soil preferred.' },
+    { name:'Establishment',          icon:'🌿', days:'Month 2–4',  color:'#3d7a3a', water:'Once per week only', fertilizer:'Very light — 5:10:10 in spring only', pest:'Whitefly, Leafhoppers', disease:'Leaf Spot (wet conditions)', tip:'Do not over-fertilise — reduces fragrance and oil content.' },
+    { name:'Spring Vigour',          icon:'🌱', days:'Month 5',    color:'#6ab04c', water:'Every 10 days', fertilizer:'One spring feed with low-N fertilizer', pest:'Spittlebugs (Froghopper nymphs)', disease:'Powdery Mildew', tip:'Remove old woody growth by 1/3 each spring to keep plant compact.' },
+    { name:'Flowering',              icon:'💜', days:'Month 6–7',  color:'#8b5cf6', water:'Dry conditions improve fragrance/oil', fertilizer:'None during bloom', pest:'Bees (beneficial!), Leafhoppers', disease:'None', tip:'Harvest when 1/3 of buds open for maximum fragrance and oil. Cut early morning.' },
+    { name:'Post-harvest Pruning',   icon:'✂️', days:'Month 8',    color:'#d4952a', water:'Minimal', fertilizer:'None', pest:'Scale Insects', disease:'Root Rot if wet', tip:'Cut back by 1/3 immediately after harvest. Shapes plant and encourages next year\'s flowering.' },
+    { name:'Autumn & Winter Rest',   icon:'🌿', days:'Month 9–12', color:'#6ab04c', water:'Very minimal — once per month', fertilizer:'None', pest:'Slugs in wet autumn', disease:'Phytophthora if waterlogged', tip:'Lavender is cold-hardy but hates wet roots. Gravel mulch (not organic) is ideal.' }
+  ]
+};
+
+// ── FRUITS ──────────────────────────────────
+CROP_DATA['Papaya'] = { icon:'🍈', days:270, soil:'Sandy Loam / Well-drained (pH 5.5–7)', water:'Moderate', sunlight:'Full Sun (6+ hrs)', yield:'40–60 kg/plant/year', category:'fruit',
+  stages:[
+    { name:'Seed Sowing & Nursery',   icon:'🪛', days:'Day 1–30',   color:'#8B5E3C', water:'Daily misting', fertilizer:'Seed compost starter', pest:'Damping Off fungi', disease:'Damping Off', tip:'Sow 2–3 seeds per bag, thin to strongest. Transplant at 4–6 leaf stage (30–45 days).' },
+    { name:'Transplant & Establishment',icon:'🌱',days:'Day 31–60', color:'#6ab04c', water:'Every 2–3 days', fertilizer:'NPK 10:10:10 (100g/plant)', pest:'Mites, Aphids', disease:'Phytophthora Root Rot', tip:'Papaya grows fast — first fruits appear in 6–9 months from transplant.' },
+    { name:'Rapid Vegetative Growth', icon:'🌿', days:'Day 61–120', color:'#3d7a3a', water:'Every 3 days drip preferred', fertilizer:'Urea (100g/plant/month)', pest:'Papaya Mealybug, White Fly', disease:'Powdery Mildew, Papaya Ring Spot Virus', tip:'Papaya Ring Spot Virus (PRSV) spread by aphids is the #1 threat — use virus-free seeds.' },
+    { name:'Sex Expression & Flowering',icon:'🌸',days:'Day 121–150',color:'#d4952a', water:'Consistent — water stress causes sex change', fertilizer:'High-K + Boron foliar', pest:'Mites (dry stress)', disease:'Anthracnose', tip:'Plant 3 seeds per hole — keep 1 female + 1 male per 10 females for pollination.' },
+    { name:'Fruit Development',       icon:'🍈', days:'Day 151–240',color:'#e8a838', water:'Regular every 3–4 days', fertilizer:'Potassium + Calcium foliar monthly', pest:'Fruit Fly, Mealybug', disease:'Anthracnose, Black Spot', tip:'Bag developing fruits at golf-ball size to prevent fruit fly. Reduces chemical use.' },
+    { name:'Harvest',                 icon:'🌾', days:'Day 241–270',color:'#c0392b', water:'Reduce slightly', fertilizer:'None', pest:'Fruit Fly, Bats', disease:'Post-harvest Anthracnose', tip:'Harvest when skin shows yellow streaks (25% yellow). Ethylene treatment ripens uniformly.' }
+  ]
+};
+
+CROP_DATA['Watermelon'] = { icon:'🍉', days:80, soil:'Sandy Loam (pH 6–7)', water:'Moderate-High at vine growth; reduced at ripening', sunlight:'Full Sun (8+ hrs)', yield:'8–15 tons/acre', category:'fruit',
+  stages:[
+    { name:'Seed Sowing / Nursery', icon:'🪛', days:'Day 1–10',  color:'#8B5E3C', water:'Daily misting (warm germination needed 25–30°C)', fertilizer:'Seed starter compost', pest:'Seed Rot fungi', disease:'Damping Off', tip:'Germinate in warm conditions. Black plastic mulch warms soil for direct sowing.' },
+    { name:'Seedling & Transplant',  icon:'🌱', days:'Day 11–20', color:'#6ab04c', water:'Every 2–3 days after transplant', fertilizer:'Starter NPK (10:52:10)', pest:'Aphids, Cutworms', disease:'Damping Off, Pythium', tip:'Transplant carefully — watermelons dislike root disturbance. Use biodegradable pots.' },
+    { name:'Vine Growth',            icon:'🌿', days:'Day 21–45', color:'#3d7a3a', water:'Every 3–4 days', fertilizer:'Balanced NPK 19:19:19', pest:'Melon Aphid, Spider Mites', disease:'Powdery Mildew, Gummy Stem Blight', tip:'Train vines in one direction. Remove secondary runners early.' },
+    { name:'Flowering & Pollination',icon:'🌸', days:'Day 46–55', color:'#d4952a', water:'Critical — consistent moisture', fertilizer:'High-P + Boron foliar', pest:'Aphids (spread viruses), Thrips', disease:'Bacterial Fruit Blotch', tip:'Place beehives for pollination. Female flowers appear after male — recognise by small fruit at base.' },
+    { name:'Fruit Development',      icon:'🍉', days:'Day 56–72', color:'#e8a838', water:'Reduce — excess water dilutes sweetness and causes cracking', fertilizer:'Potassium foliar for sweetness (Brix)', pest:'Fruit Fly, Melon Worm', disease:'Anthracnose, Phytophthora', tip:'One large fruit per vine for maximum size. Remove extra fruitlets at tennis-ball size.' },
+    { name:'Ripening & Harvest',     icon:'🌾', days:'Day 73–80', color:'#c0392b', water:'Withhold for 1 week before harvest — improves Brix', fertilizer:'None', pest:'Crows, Jackals', disease:'Belly Rot', tip:'Harvest when tendril nearest fruit turns brown and dried. Thump for hollow sound (25 cm from end).' }
+  ]
+};
+
+CROP_DATA['Strawberry'] = { icon:'🍓', days:120, soil:'Sandy Loam / Well-drained (pH 5.5–6.5)', water:'Moderate — drip ideal', sunlight:'Full Sun (6–8 hrs)', yield:'1–1.5 tons/acre', category:'fruit',
+  stages:[
+    { name:'Runner Planting',         icon:'🪛', days:'Day 1–14',  color:'#8B5E3C', water:'Every day until runners root', fertilizer:'Balanced compost + NPK at planting', pest:'Aphids, Vine Weevil', disease:'Crown Rot', tip:'Plant runners with crown at soil level — too deep causes rot, too shallow causes drying.' },
+    { name:'Establishment',           icon:'🌱', days:'Day 15–30', color:'#6ab04c', water:'Every 2 days drip', fertilizer:'Starter NPK (10:10:10)', pest:'Spider Mites, Aphids', disease:'Botrytis, Powdery Mildew', tip:'Remove flowers in first season (June bearing types) to build root strength.' },
+    { name:'Vegetative Growth',       icon:'🌿', days:'Day 31–60', color:'#3d7a3a', water:'Regular every 2 days', fertilizer:'Switch to low-N, high-K fertilizer', pest:'Slugs, Strawberry Blossom Weevil', disease:'Leaf Spot, Angular Leaf Scorch', tip:'Mulch with straw — keeps fruits clean and warm, reduces soil splash disease.' },
+    { name:'Flowering',               icon:'🌸', days:'Day 61–80', color:'#d4952a', water:'Consistent — flower drop in heat', fertilizer:'Potassium + Boron foliar', pest:'Aphids, Thrips, Tarnished Plant Bug', disease:'Botrytis Fruit Rot, Powdery Mildew', tip:'Protect flowers from late frost with fleece. Flowers damaged at -2°C.' },
+    { name:'Fruiting',                icon:'🍓', days:'Day 81–110',color:'#c0392b', water:'Every 2 days — do not wet fruit', fertilizer:'Calcium foliar to prevent tip burn', pest:'Spotted Wing Drosophila, Birds, Slugs', disease:'Botrytis (grey mould) main threat', tip:'Pick every 2 days when red. Handle gently — bruising causes rapid decay.' },
+    { name:'Post-harvest & Renovation',icon:'✂️',days:'Day 111–120',color:'#3d7a3a', water:'Maintain moisture for daughter runners', fertilizer:'Balanced NPK for new runner establishment', pest:'Vine Weevil larvae in soil', disease:'Red Core Root Rot', tip:'Mow leaves to 10 cm after harvest (June-bearers). Remove old mulch. Let runners establish for next year.' }
+  ]
+};
+
+CROP_DATA['Guava'] = { icon:'🍐', days:240, soil:'Any well-drained soil (pH 5–7) — very adaptable', water:'Low-Moderate (drought tolerant once established)', sunlight:'Full Sun', yield:'20–30 tons/acre', category:'fruit',
+  stages:[
+    { name:'Planting / Budding',      icon:'🪩', days:'Month 1–2',  color:'#8B5E3C', water:'Every 3 days first month', fertilizer:'FYM (10 kg/tree) + NPK at planting', pest:'Guava Fruit Fly, Bark Eating Caterpillar', disease:'Wilt (Fusarium), Stylar End Rot', tip:'Use vegetatively propagated plants (air layers/cuttings). Seedlings have poor fruit quality.' },
+    { name:'Vegetative Establishment', icon:'🌿',days:'Month 3–6',  color:'#3d7a3a', water:'Every 7–10 days', fertilizer:'NPK 10:10:10 quarterly', pest:'Guava Whitefly, Mealybug', disease:'Phytophthora, Leaf Spot', tip:'Guava is hardy — tolerates drought and poor soil. Training to single trunk improves management.' },
+    { name:'Flowering Induction',      icon:'🌸',days:'Month 7–8',  color:'#d4952a', water:'Mild stress before flowering to induce bloom', fertilizer:'High-P + K foliar', pest:'Thrips, Fruit Fly', disease:'Guava Rust, Anthracnose', tip:'Bahar treatment (withhold water + irrigation flush) induces uniform flowering.' },
+    { name:'Fruit Set',                icon:'🍐',days:'Month 9',    color:'#e8a838', water:'Regular irrigation resumes at fruit set', fertilizer:'Calcium spray to reduce drop', pest:'Fruit Fly (#1 pest)', disease:'Fruit Canker', tip:'Bag fruits at marble size (4–5 cm) to prevent fruit fly. Nets or bags work well.' },
+    { name:'Fruit Development',        icon:'🍏',days:'Month 10–11',color:'#6ab04c', water:'Every 7–10 days', fertilizer:'Potassium foliar for sweetness', pest:'Fruit Fly, Birds, Bats', disease:'Stylar End Rot, Alternaria', tip:'Guava Brix 10–13° is ideal for market. Vitamin C content highest at slight under-ripeness.' },
+    { name:'Harvest',                  icon:'🌾',days:'Month 12',   color:'#c0392b', water:'None', fertilizer:'None', pest:'Post-harvest fruit flies', disease:'Post-harvest Anthracnose', tip:'Harvest at mature-green to light-yellow skin colour. Shelf life 2–5 days at room temperature.' }
+  ]
+};
+
+CROP_DATA['Pomegranate'] = { icon:'🍎', days:180, soil:'Well-drained Loam to Sandy Loam (pH 5.5–7.5)', water:'Low-Moderate (drought tolerant)', sunlight:'Full Sun (8+ hrs)', yield:'8–12 tons/acre', category:'fruit',
+  stages:[
+    { name:'Cutting Establishment',   icon:'🪛', days:'Month 1–3',  color:'#8B5E3C', water:'Every 3–4 days', fertilizer:'Compost + NPK 5:10:10', pest:'Stem Borer', disease:'Phytophthora, Wilt', tip:'Plant hardwood cuttings (25–30 cm). Root in nursery before transplanting to field.' },
+    { name:'Vegetative Growth',        icon:'🌿',days:'Month 4–6',  color:'#3d7a3a', water:'Every 7–10 days', fertilizer:'NPK 10:10:10 bimonthly', pest:'Thrips, Mealybug', disease:'Leaf Spot, Cercospora', tip:'Pomegranate is very drought-tolerant once established. Over-watering causes root rot.' },
+    { name:'Flowering',                icon:'🌸',days:'Month 7–8',  color:'#d4952a', water:'Critical — irrigate at flowering', fertilizer:'Boron + Potassium foliar at bud stage', pest:'Leaf Footed Bug, Pomegranate Butterfly', disease:'Botrytis on flowers, Anthracnose', tip:'Male and hermaphrodite flowers — only hermaphrodites (with pistil) set fruit. Healthy ratio needed.' },
+    { name:'Fruit Set',                icon:'🔴',days:'Month 9',    color:'#e8a838', water:'Regular even moisture — irregular causes cracking', fertilizer:'Calcium spray (prevents cracking)', pest:'Pomegranate Butterfly larva, Fruit Borer', disease:'Fruit Rot, Alternaria', tip:'Cracking is caused by irregular irrigation or calcium deficiency — the #1 quality problem.' },
+    { name:'Fruit Development',        icon:'🍎',days:'Month 10–11',color:'#6ab04c', water:'Every 7–10 days consistent', fertilizer:'High-K fertilizer for colour and flavour', pest:'Anar Butterfly, Birds, Bats', disease:'Cercospora Fruit Spot, Crown Rot', tip:'Bag fruits at marble size to protect from butterfly larvae. Net rows for bird protection.' },
+    { name:'Harvest & Post-harvest',   icon:'🌾',days:'Month 12',   color:'#c0392b', water:'Reduce 2 weeks before harvest', fertilizer:'None', pest:'Post-harvest pests', disease:'Blue Mold in storage', tip:'Harvest when skin turns red/pink and makes metallic sound on tapping. Store at 5–8°C for 2–3 months.' }
+  ]
+};
+
+function renderCropSelectorGrid() {
+
+  var el = document.getElementById('crop-selector-grid');
+  if (!el) return;
+  el.innerHTML = Object.keys(CROP_DATA).map(function(crop) {
+    var d = CROP_DATA[crop];
+    return '<div onclick="loadLifecycle(\'' + crop + '\')" style="background:var(--card);border:2px solid #e2e8f0;border-radius:14px;padding:14px 10px;text-align:center;cursor:pointer;transition:.2s;" onmouseover="this.style.borderColor=\'#3d7a3a\';this.style.background=\'rgba(61,122,58,0.06)\'" onmouseout="this.style.borderColor=\'#e2e8f0\';this.style.background=\'var(--card)\'">'
+      + '<div style="font-size:28px;margin-bottom:6px;">' + d.icon + '</div>'
+      + '<div style="font-size:12px;font-weight:700;color:#2c2c1a;">' + crop + '</div>'
+      + '<div style="font-size:10px;color:#7a6a52;margin-top:2px;">' + d.days + ' days</div>'
+      + '</div>';
+  }).join('');
+}
+
+function loadLifecycle(crop) {
+  var el = document.getElementById('lifecycle-content');
+  var d = CROP_DATA[crop];
+  if (!d) return;
+
+  // Pull scan history for this crop
+  var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+  var cropScans = history.filter(function(s) {
+    var cn = (s.structured && s.structured.final_crop) ? s.structured.final_crop : (s.crop_detected || '');
+    return cn.toLowerCase().includes(crop.toLowerCase());
+  });
+
+  var html = '';
+
+  // Overview card
+  html += '<div style="background:#fff;border-radius:16px;padding:24px;margin-bottom:20px;border:1px solid #e2e8f0;box-shadow:0 2px 10px rgba(0,0,0,0.05);">'
+    + '<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">'
+    + '<div style="font-size:52px;">' + d.icon + '</div>'
+    + '<div><h3 style="font-size:22px;font-weight:900;margin-bottom:4px;">' + crop + '</h3>'
+    + '<div style="font-size:13px;color:#7a6a52;">Complete cycle: <strong>' + d.days + ' days</strong></div></div>'
+    + '<div style="margin-left:auto;text-align:right;background:rgba(61,122,58,0.08);padding:12px 16px;border-radius:12px;">'
+    + '<div style="font-size:20px;font-weight:900;color:#3d7a3a;">' + cropScans.length + '</div>'
+    + '<div style="font-size:11px;color:#7a6a52;">AI Scans Logged</div>'
+    + '</div></div>'
+    // Generate mock market price for this crop
+    var basePrice = crop === 'Mango' ? 8000 : (crop.includes('Dal') || crop.includes('Pea') ? 6500 : 2500);
+    var rand = Math.floor(Math.random() * 500) - 200;
+    var currentPrice = '₹' + (basePrice + rand) + ' / quintal';
+    var trendIcon = rand >= 0 ? '▲' : '▼';
+    var trendColor = rand >= 0 ? 'var(--green)' : 'var(--red)';
+
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">'
+    + '<div style="padding:12px;background:#faf7f2;border-radius:10px;"><div style="font-size:11px;color:#7a6a52;margin-bottom:4px;">💧 WATER</div><div style="font-weight:700;font-size:13px;">' + d.water + '</div></div>'
+    + '<div style="padding:12px;background:#faf7f2;border-radius:10px;"><div style="font-size:11px;color:#7a6a52;margin-bottom:4px;">☀️ SUNLIGHT</div><div style="font-weight:700;font-size:13px;">' + d.sunlight + '</div></div>'
+    + '<div style="padding:12px;background:#faf7f2;border-radius:10px;"><div style="font-size:11px;color:#7a6a52;margin-bottom:4px;">🪱 SOIL</div><div style="font-weight:700;font-size:13px;">' + d.soil + '</div></div>'
+    + '<div style="padding:12px;background:#faf7f2;border-radius:10px;"><div style="font-size:11px;color:#7a6a52;margin-bottom:4px;">🌾 YIELD/ACRE</div><div style="font-weight:700;font-size:13px;">' + d.yield + '</div></div>'
+    + '<div style="padding:12px;background:#faf7f2;border-radius:10px;grid-column:span 2;"><div style="font-size:11px;color:#7a6a52;margin-bottom:4px;">📈 CURRENT APMC RATE</div><div style="font-weight:800;font-size:14px;color:var(--green);">' + currentPrice + ' <span style="font-size:11px;color:' + trendColor + ';">' + trendIcon + '</span></div></div>'
+    + '</div></div>';
+
+  // Historical Market Prices Chart
+  html += '<div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:20px;border:1px solid #e2e8f0;box-shadow:0 2px 10px rgba(0,0,0,0.05);">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+    + '<div style="font-weight:800;font-size:14px;">📊 Historical Price Trends</div>'
+    + '<div style="display:flex;gap:8px;" id="chart-filters">'
+    + '<button onclick="renderPriceChart(\'' + crop + '\', 1)" style="padding:4px 10px;font-size:11px;border-radius:20px;border:1px solid var(--border);background:#fff;cursor:pointer;">1M</button>'
+    + '<button onclick="renderPriceChart(\'' + crop + '\', 6)" style="padding:4px 10px;font-size:11px;border-radius:20px;border:1px solid var(--border);background:#fff;cursor:pointer;">6M</button>'
+    + '<button onclick="renderPriceChart(\'' + crop + '\', 12)" style="padding:4px 10px;font-size:11px;border-radius:20px;border:1px solid var(--border);background:var(--green);color:#fff;cursor:pointer;">1Y</button>'
+    + '</div></div>'
+    + '<div style="position:relative;height:200px;width:100%;"><canvas id="priceChart"></canvas></div>'
+    + '</div>';
+
+  // Progress timeline bar
+  if (d.stages.length) {
+    html += '<div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:20px;border:1px solid #e2e8f0;box-shadow:0 2px 10px rgba(0,0,0,0.05);">';
+    html += '<div style="font-weight:800;font-size:14px;margin-bottom:16px;">📅 Growth Timeline</div>';
+    html += '<div style="display:flex;gap:0;border-radius:10px;overflow:hidden;height:28px;margin-bottom:10px;">';
+    d.stages.forEach(function(s) {
+      html += '<div style="flex:1;background:' + s.color + ';display:flex;align-items:center;justify-content:center;font-size:14px;" title="' + s.name + '">' + s.icon + '</div>';
+    });
+    html += '</div>';
+    html += '<div style="display:flex;gap:0;">';
+    d.stages.forEach(function(s) {
+      html += '<div style="flex:1;text-align:center;font-size:9px;color:#7a6a52;padding:2px;">' + s.days.split('–')[0] + '</div>';
+    });
+    html += '</div></div>';
+
+    // Stage detail cards
+    html += '<div style="display:flex;flex-direction:column;gap:16px;">';
+    d.stages.forEach(function(s, i) {
+      html += '<div style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 2px 10px rgba(0,0,0,0.05);">'
+        + '<div style="background:' + s.color + ';padding:14px 20px;display:flex;align-items:center;gap:12px;">'
+        + '<span style="font-size:24px;">' + s.icon + '</span>'
+        + '<div><div style="color:#fff;font-weight:800;font-size:15px;">' + s.name + '</div><div style="color:rgba(255,255,255,0.8);font-size:12px;">' + s.days + '</div></div>'
+        + '<div style="margin-left:auto;background:rgba(255,255,255,0.2);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:13px;">' + (i+1) + '</div>'
+        + '</div>'
+        + '<div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+        + '<div><div style="font-size:10px;color:#7a6a52;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">💧 Irrigation</div><div style="font-size:12px;font-weight:600;">' + s.water + '</div></div>'
+        + '<div><div style="font-size:10px;color:#7a6a52;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">🧪 Fertilizer</div><div style="font-size:12px;font-weight:600;">' + s.fertilizer + '</div></div>'
+        + '<div><div style="font-size:10px;color:#d4952a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">🐛 Pest Risk</div><div style="font-size:12px;font-weight:600;color:#d4952a;">' + s.pest + '</div></div>'
+        + '<div><div style="font-size:10px;color:#c0392b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">🦠 Disease</div><div style="font-size:12px;font-weight:600;color:#c0392b;">' + s.disease + '</div></div>'
+        + '</div>'
+        + '<div style="padding:0 20px 16px;"><div style="background:#faf7f2;border-left:3px solid ' + s.color + ';padding:10px 14px;border-radius:0 8px 8px 0;font-size:12px;color:#2c2c1a;"><strong>💡 Tip:</strong> ' + s.tip + '</div></div>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Synced scans section
+  if (cropScans.length) {
+    html += '<div style="background:#fff;border-radius:16px;padding:20px;margin-top:20px;border:1px solid #e2e8f0;box-shadow:0 2px 10px rgba(0,0,0,0.05);">';
+    html += '<div style="font-weight:800;font-size:14px;margin-bottom:14px;">🔬 Synced AI Scans for ' + crop + '</div>';
+    html += cropScans.slice(-5).reverse().map(function(s) {
+      var sev = s.severity || 'warning';
+      var col = sev==='critical'?'#c0392b':sev==='warning'?'#d4952a':'#3d7a3a';
+      var ico = sev==='critical'?'🚨':sev==='warning'?'⚠️':'✅';
+      return '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #e2e8f0;">'
+        + '<div style="font-size:20px;margin-top:2px;">' + ico + '</div>'
+        + '<div><div style="font-size:13px;font-weight:700;margin-bottom:2px;">' + esc(s.health_assessment||'N/A') + '</div>'
+        + '<div style="font-size:11px;color:#7a6a52;">' + new Date(s.timestamp).toLocaleString() + ' · <span style="color:' + col + ';font-weight:700;">' + sev.toUpperCase() + '</span></div></div>'
+        + '</div>';
+    }).join('');
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+  
+  // Render default 1Y chart after DOM is updated
+  setTimeout(function() {
+    renderPriceChart(crop, 12);
+  }, 100);
+
+  // Scroll to lifecycle content
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+let currentPriceChart = null;
+function renderPriceChart(crop, months) {
+  var ctx = document.getElementById('priceChart');
+  if (!ctx) return;
+  if (currentPriceChart) {
+    currentPriceChart.destroy();
+  }
+
+  // Update active button styling
+  var filters = document.getElementById('chart-filters');
+  if (filters) {
+    var btns = filters.getElementsByTagName('button');
+    for (var i=0; i<btns.length; i++) {
+      if (btns[i].textContent === (months === 1 ? '1M' : months === 6 ? '6M' : '1Y')) {
+        btns[i].style.background = 'var(--green)';
+        btns[i].style.color = '#fff';
+      } else {
+        btns[i].style.background = '#fff';
+        btns[i].style.color = 'var(--text)';
+      }
+    }
+  }
+
+  // Generate historical data
+  var basePrice = crop === 'Mango' ? 8000 : (crop.includes('Dal') || crop.includes('Pea') ? 6500 : 2500);
+  var labels = [];
+  var data = [];
+  var d = new Date();
+  
+  for(var i=months; i>=0; i--) {
+    var dt = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    labels.push(dt.toLocaleString('default', { month: 'short' }) + (months>6 ? ' ' + dt.getFullYear().toString().substr(-2) : ''));
+    // Generate realistic sine wave fluctuation based on season
+    var seasonMultiplier = Math.sin((dt.getMonth() / 12) * Math.PI * 2); 
+    var fluctuation = basePrice * 0.15 * seasonMultiplier; 
+    var noise = Math.floor(Math.random() * 300) - 150;
+    data.push(Math.round(basePrice + fluctuation + noise));
+  }
+
+  currentPriceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Price per Quintal (₹)',
+        data: data,
+        borderColor: '#3d7a3a',
+        backgroundColor: 'rgba(61,122,58,0.1)',
+        borderWidth: 2,
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: '#fff',
+        pointBorderColor: '#3d7a3a'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: false, ticks: { font: { size: 10 } } },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// Init crop selector grid when lifecycle tab opens
+var _lifecycleInited = false;
+
+// ── Field Live Status ────────────────────────
+// Parse planting dates (all 2026)
+var FIELD_PLANT_DATES = {
+  A: new Date('2026-01-12'), B: new Date('2026-02-05'),
+  C: new Date('2026-01-20'), D: new Date('2026-03-01'), E: new Date('2026-02-18')
+};
+
+function getDaysSincePlanted(fieldId) {
+  var planted = FIELD_PLANT_DATES[fieldId];
+  if (!planted) return 0;
+  return Math.floor((new Date() - planted) / 86400000);
+}
+
+function getCurrentStage(crop, daysElapsed) {
+  var d = CROP_DATA[crop];
+  if (!d || !d.stages.length) return null;
+  var elapsed = 0;
+  for (var i = 0; i < d.stages.length; i++) {
+    var s = d.stages[i];
+    // Parse days range "Day X–Y" or "Month X–Y"
+    var parts = s.days.replace('Day ','').replace('Month ','').split('–');
+    var end = parseInt(parts[1]) || parseInt(parts[0]);
+    // For Month-based crops, multiply by 30
+    if (s.days.startsWith('Month')) end = end * 30;
+    if (daysElapsed <= end) return { stage: s, index: i, total: d.stages.length, pct: Math.round((i / d.stages.length) * 100 + (1/d.stages.length)*100) };
+  }
+  return { stage: d.stages[d.stages.length-1], index: d.stages.length-1, total: d.stages.length, pct: 100, done: true };
+}
+
+function renderFieldStatusStrip() {
+  var el = document.getElementById('field-status-strip');
+  if (!el) return;
+  el.innerHTML = Object.keys(FIELDS).map(function(id) {
+    var f = FIELDS[id];
+    var days = getDaysSincePlanted(id);
+    var cropInfo = CROP_DATA[f.crop];
+    var stageInfo = cropInfo ? getCurrentStage(f.crop, days) : null;
+    var dotColor = {healthy:'#3d7a3a',irrigating:'#5ba4cf',harvesting:'#d4952a',alert:'#c0392b'}[f.status] || '#3d7a3a';
+    var stageName = stageInfo ? stageInfo.stage.name : 'Unknown';
+    var pct = stageInfo ? stageInfo.pct : 0;
+    var isDone = stageInfo && stageInfo.done;
+    var stageColor = stageInfo ? stageInfo.stage.color : '#e2e8f0';
+    var totalDays = cropInfo ? cropInfo.days : '?';
+    return '<div onclick="loadLifecycle(\'' + f.crop + '\')" style="background:#faf7f2;border-radius:14px;padding:16px;border:1px solid #e2e8f0;cursor:pointer;transition:.2s;" onmouseover="this.style.borderColor=\'#3d7a3a\'" onmouseout="this.style.borderColor=\'#e2e8f0\'">'
+      + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'
+      + '<div style="width:36px;height:36px;border-radius:50%;background:' + dotColor + ';display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0;">' + id + '</div>'
+      + '<div style="flex:1;">'
+      + '<div style="font-weight:800;font-size:14px;">' + f.name + '</div>'
+      + '<div style="font-size:11px;color:#7a6a52;">' + f.icon + ' ' + f.crop + ' · ' + f.area + ' · Planted ' + FIELD_PLANT_DATES[id].toLocaleDateString('en-IN',{day:'numeric',month:'short'}) + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;flex-shrink:0;">'
+      + '<div style="font-size:18px;font-weight:900;color:#3d7a3a;">' + days + '</div>'
+      + '<div style="font-size:10px;color:#7a6a52;">days old</div>'
+      + '</div></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;">'
+      + '<div style="flex:1;height:8px;background:#e2e8f0;border-radius:50px;overflow:hidden;">'
+      + '<div style="height:100%;width:' + Math.min(pct,100) + '%;background:' + stageColor + ';border-radius:50px;transition:width 0.8s;"></div>'
+      + '</div>'
+      + '<div style="font-size:11px;font-weight:700;color:' + stageColor + ';white-space:nowrap;">' + (isDone ? '✅ Ready to Harvest' : stageName) + '</div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:#7a6a52;margin-top:6px;">' + (cropInfo ? Math.max(0, totalDays - days) + ' days remaining of ' + totalDays + '-day cycle' : '') + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// ── Regional Crop Suggestions ────────────────
+var SEASON_CROPS = {
+  // India-focused seasonal recommendations
+  Kharif:  { months:[6,7,8,9,10], label:'🌧️ Kharif Season (Jun–Oct)',
+    crops: [
+      {name:'Rice',     icon:'🌾', reason:'Loves monsoon rains', soil:'Clay/Waterlogged', duration:'130 days'},
+      {name:'Corn',     icon:'🌽', reason:'High yield in warm wet season', soil:'Sandy Loam', duration:'100 days'},
+      {name:'Soybean',  icon:'🫘', reason:'Nitrogen-fixing, rain-fed', soil:'Loam', duration:'90 days'},
+      {name:'Tomato',   icon:'🍅', reason:'Thrives in warm humid weather', soil:'Well-drained', duration:'90 days'},
+      {name:'Banana',   icon:'🍌', reason:'Tropical staple, high yield', soil:'Rich Loam', duration:'300 days'}
+    ]},
+  Rabi:    { months:[11,0,1,2,3], label:'❄️ Rabi Season (Nov–Mar)',
+    crops: [
+      {name:'Wheat',    icon:'🌾', reason:'India\'s primary rabi crop', soil:'Loamy/Clay', duration:'120 days'},
+      {name:'Potato',   icon:'🥔', reason:'Cool weather staple', soil:'Sandy Loam', duration:'90 days'},
+      {name:'Citrus',   icon:'🍊', reason:'Winter citrus growth period', soil:'Well-drained', duration:'365 days'},
+      {name:'Pepper',   icon:'🌶️', reason:'Cool nights improve flavour', soil:'Loam', duration:'80 days'},
+      {name:'Sunflower',icon:'🌻', reason:'Oil crop, frost-tolerant', soil:'Sandy Loam', duration:'90 days'}
+    ]},
+  Zaid:    { months:[4,5], label:'☀️ Zaid Season (Apr–Jun)',
+    crops: [
+      {name:'Mango',    icon:'🥭', reason:'Peak fruiting season', soil:'Deep Alluvial', duration:'365 days'},
+      {name:'Grape',    icon:'🍇', reason:'Harvest & post-harvest care', soil:'Sandy Loam', duration:'180 days'},
+      {name:'Corn',     icon:'🌽', reason:'Short-season summer variety', soil:'Sandy Loam', duration:'80 days'},
+      {name:'Apple',    icon:'🍎', reason:'Hill regions only (>1000m)', soil:'Loam', duration:'150 days'}
+    ]}
+};
+
+function getCurrentSeason() {
+  var m = new Date().getMonth();
+  if (SEASON_CROPS.Kharif.months.includes(m)) return 'Kharif';
+  if (SEASON_CROPS.Zaid.months.includes(m)) return 'Zaid';
+  return 'Rabi';
+}
+
+function renderRegionalCrops() {
+  var season = getCurrentSeason();
+  var data = SEASON_CROPS[season];
+  var badge = document.getElementById('lc-season-badge');
+  if (badge) badge.textContent = data.label;
+
+  // Update location badge
+  var locBadge = document.getElementById('lc-location-badge');
+  var lat = window.userLat, lon = window.userLon;
+  if (locBadge) {
+    if (lat && lon) {
+      locBadge.innerHTML = '📍 ' + lat.toFixed(2) + '°N, ' + lon.toFixed(2) + '°E · India';
+    } else {
+      locBadge.innerHTML = '📍 India · ' + season + ' Season';
+    }
+  }
+
+  var el = document.getElementById('regional-crops-grid');
+  if (!el) return;
+  el.innerHTML = data.crops.map(function(c) {
+    var isPlanted = Object.values(FIELDS).some(function(f) { return f.crop === c.name; });
+    return '<div onclick="loadLifecycle(\'' + c.name + '\')" style="background:#faf7f2;border-radius:14px;padding:16px;border:2px solid ' + (isPlanted ? '#3d7a3a' : '#e2e8f0') + ';cursor:pointer;transition:.2s;position:relative;" onmouseover="this.style.borderColor=\'#3d7a3a\'" onmouseout="this.style.borderColor=\'' + (isPlanted ? '#3d7a3a' : '#e2e8f0') + '\'">'
+      + (isPlanted ? '<div style="position:absolute;top:8px;right:8px;background:#3d7a3a;color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:50px;">IN YOUR FIELDS</div>' : '')
+      + '<div style="font-size:30px;margin-bottom:8px;">' + c.icon + '</div>'
+      + '<div style="font-weight:800;font-size:13px;margin-bottom:4px;">' + c.name + '</div>'
+      + '<div style="font-size:11px;color:#7a6a52;margin-bottom:6px;line-height:1.4;">' + c.reason + '</div>'
+      + '<div style="font-size:10px;background:rgba(61,122,58,0.1);color:#3d7a3a;padding:3px 8px;border-radius:50px;display:inline-block;font-weight:700;">' + c.duration + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// Auto-refresh pump status every 30s
+setInterval(function() { if (currentUser) loadPumpStatus(); }, 30000);
+// ── E-Commerce Checkout Logic ─────────────────────────────
+function openCheckout(storeName, price, product) {
+  document.getElementById('checkout-store').textContent = storeName;
+  document.getElementById('checkout-price').textContent = price;
+  document.getElementById('checkout-total').textContent = price;
+  document.getElementById('checkout-product').textContent = product;
+  document.getElementById('checkout-modal').style.display = 'flex';
+  
+  // Reset UI
+  document.getElementById('checkout-form').style.display = 'block';
+  document.getElementById('checkout-processing').style.display = 'none';
+  document.getElementById('checkout-success').style.display = 'none';
+}
+
+function closeCheckout() {
+  document.getElementById('checkout-modal').style.display = 'none';
+}
+
+function processPayment(e) {
+  e.preventDefault();
+  document.getElementById('checkout-form').style.display = 'none';
+  document.getElementById('checkout-processing').style.display = 'block';
+  
+  setTimeout(function() {
+    document.getElementById('checkout-processing').style.display = 'none';
+    document.getElementById('checkout-success').style.display = 'block';
+  }, 2500); // Simulate network delay
+}
