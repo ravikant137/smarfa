@@ -25,7 +25,7 @@ export default function RegisterScreen({ navigation }) {
 
     setLoading(true);
     try {
-      const response = await axios.post(`${getApiBaseUrl()}/register`, {
+      const response = await axios.post(`${getApiBaseUrl()}/api/register`, {
         username: email.trim().toLowerCase(),
         password,
         name

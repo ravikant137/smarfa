@@ -21,7 +21,7 @@ export default function LoginScreen({ navigation }) {
     setError('');
     setLoading(true);
     try {
-      const response = await axios.post(`${getApiBaseUrl()}/login`, {
+      const response = await axios.post(`${getApiBaseUrl()}/api/login`, {
         username: email.trim(),
         password
       });

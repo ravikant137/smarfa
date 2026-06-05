@@ -4,7 +4,7 @@
   "buildCommand": "cd mobile-app && npx expo export -p web",
   "outputDirectory": "mobile-app/dist",
   "rewrites": [
-    { "source": "/login", "destination": "/api/login" },
-    { "source": "/register", "destination": "/api/register" }
+    { "source": "/api/v1/:path*", "destination": "/api/v1/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
