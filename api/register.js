@@ -6,6 +6,10 @@ export default async function handler(req, res) {
   const { username, password } = req.body || {};
 
   try {
+    if (!supabase) {
+      return res.status(500).json({ detail: 'Backend registration failed: Supabase credentials are not configured on Vercel' });
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: username,
       password,

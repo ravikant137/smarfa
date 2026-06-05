@@ -34,15 +34,27 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
-// Create the standard client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+let supabaseClient = null;
+let supabaseAdminClient = null;
 
-// Create the admin client (only works on server-side)
-export const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
-  ? createClient(supabaseUrl, supabaseServiceKey, {
+try {
+  if (supabaseUrl && supabaseAnonKey) {
+    supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  
+  if (supabaseUrl && supabaseServiceKey) {
+    supabaseAdminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
-    })
-  : supabase;
+    });
+  } else if (supabaseClient) {
+    supabaseAdminClient = supabaseClient;
+  }
+} catch (e) {
+  console.error("Supabase Init Error:", e);
+}
+
+export const supabase = supabaseClient;
+export const supabaseAdmin = supabaseAdminClient;
