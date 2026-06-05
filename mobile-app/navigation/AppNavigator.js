@@ -8,6 +8,7 @@ import HomeScreen from '../screens/HomeScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import CropScanScreen from '../screens/CropScanScreen';
+import DocumentScanScreen from '../screens/DocumentScanScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -46,6 +47,14 @@ function MainTabs({ route }) {
         initialParams={params}
         options={{
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="leaf-circle" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Doc Scan"
+        component={DocumentScanScreen}
+        initialParams={params}
+        options={{
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="file-document" size={size} color={color} />,
         }}
       />
       <Tab.Screen

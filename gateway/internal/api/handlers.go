@@ -73,10 +73,10 @@ func HandleScanRequest(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Println("Routing request to Python AI Service...")
-	resp, err := services.CallPythonAIService(req)
+	log.Println("Routing request directly to Ollama Vision Model (Qwen2.5)...")
+	resp, err := services.CallOllamaDirectly(req)
 	if err != nil {
-		log.Printf("AI Service Error: %v", err)
+		log.Printf("Ollama Error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"success": false,
 			"message": "AI processing failed",
@@ -97,7 +97,7 @@ func HandleScanRequest(c *fiber.Ctx) error {
 	})
 }
 
-// HandleLegacyScanRequest returns the raw, unwrapped AI response for the legacy HTML UI
+// HandleLegacyScanRequest forwards the raw AI response for the legacy HTML UI
 func HandleLegacyScanRequest(c *fiber.Ctx) error {
 	var req models.ScanRequest
 
@@ -113,7 +113,7 @@ func HandleLegacyScanRequest(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Println("Routing legacy request to Ollama via Go...")
+	log.Println("Routing legacy request directly to Ollama Vision Model (Qwen2.5)...")
 	resp, err := services.CallOllamaDirectly(req)
 	if err != nil {
 		log.Printf("Ollama Error: %v", err)
@@ -122,7 +122,51 @@ func HandleLegacyScanRequest(c *fiber.Ctx) error {
 		})
 	}
 
-	// Return raw JSON byte array directly exactly as Python sent it
+	// Return raw JSON byte array directly exactly as Ollama sent it
 	c.Set("Content-Type", "application/json")
 	return c.Send(resp)
 }
+
+// HandleDocumentScanRequest processes uploads of crop-related documents (labels, prescriptions)
+func HandleDocumentScanRequest(c *fiber.Ctx) error {
+	var req models.ScanRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "Invalid JSON payload",
+		})
+	}
+
+	if req.ImageBase64 == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "image_base64 is required",
+		})
+	}
+
+	log.Println("Routing document extraction request to Ollama Vision Model...")
+	resp, err := services.CallOllamaForDocument(req)
+	if err != nil {
+		log.Printf("Ollama Document Extraction Error: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "Document extraction failed",
+		})
+	}
+
+	// Parse raw JSON to map
+	var docData map[string]interface{}
+	if err := json.Unmarshal(resp, &docData); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "Failed to parse document extraction response",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    docData,
+	})
+}
+

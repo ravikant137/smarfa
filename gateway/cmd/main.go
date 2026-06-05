@@ -72,8 +72,13 @@ func main() {
 		return c.JSON(fiber.Map{"status": "ok", "service": "smarfa-gateway"})
 	})
 
-	// Scan endpoint
+	// Auth (for mobile)
+	v1.Post("/login", api.HandleLogin)
+	v1.Post("/register", api.HandleRegister)
+
+	// Scan endpoints
 	v1.Post("/scan", api.HandleScanRequest)
+	v1.Post("/scan_document", api.HandleDocumentScanRequest)
 
 	// Start server on port 8000
 	log.Println("Go API Gateway running on port 8000")
