@@ -1,0 +1,21 @@
+{
+  "name": "Smarfa AI Farm Intelligence",
+  "short_name": "Smarfa",
+  "description": "Smart AI Farming - Protect & Grow Your Crops Offline",
+  "start_url": "/web/index.html",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#3d7a3a",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg width='192' height='192' viewBox='0 0 192 192' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='192' height='192' fill='%233d7a3a'/%3E%3Ctext x='50%25' y='50%25' font-size='80' text-anchor='middle' alignment-baseline='middle' fill='white'%3E%F0%9F%8C%B1%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg width='512' height='512' viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='512' height='512' fill='%233d7a3a'/%3E%3Ctext x='50%25' y='50%25' font-size='200' text-anchor='middle' alignment-baseline='middle' fill='white'%3E%F0%9F%8C%B1%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
