@@ -1,0 +1,12 @@
+{
+  "name": "smarfa",
+  "version": "1.0.0",
+  "description": "Smart AI Farming is a comprehensive platform to monitor crop growth end-to-end with expert-level alerts and a beautiful mobile app interface:",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
