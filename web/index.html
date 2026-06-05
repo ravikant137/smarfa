@@ -966,7 +966,8 @@
               <div><span style="color:var(--muted);">Farm Size:</span> <br><input type="number" id="subsidies-farm-size"
                   value="2" min="1"
                   style="width:50px; padding:2px; border:1px solid #cbd5e1; border-radius:4px; font-weight:bold; background:transparent;">
-                <strong>Acres</strong></div>
+                <strong>Acres</strong>
+              </div>
             </div>
             <button class="btn btn-primary" style="margin-top:16px; width:100%;" onclick="loadSubsidies()">Check
               Eligibility Now</button>
@@ -2207,13 +2208,13 @@
           // Take only the first 1-3 words before any number or preposition
           var words = cleaned.split(/\s+/);
           var result = [];
-          var stopWords = ['at','in','per','with','of','to','on','for','a','an','the','and','or'];
+          var stopWords = ['at', 'in', 'per', 'with', 'of', 'to', 'on', 'for', 'a', 'an', 'the', 'and', 'or'];
           for (var i = 0; i < Math.min(words.length, 4); i++) {
             if (/\d/.test(words[i])) break; // stop at any number
             if (stopWords.indexOf(words[i].toLowerCase()) !== -1 && i > 0) break;
             result.push(words[i]);
           }
-          return result.join(' ').replace(/[.,;:]+$/, '').trim() || text.split(' ').slice(0,2).join(' ');
+          return result.join(' ').replace(/[.,;:]+$/, '').trim() || text.split(' ').slice(0, 2).join(' ');
         }
 
         // ── PRIMARY: Use AI-returned product data directly ──
@@ -2254,7 +2255,7 @@
         var alternatives = (aiProduct && aiProduct.alternatives) || [];
         var brandsList = [finalDisplayName];
         if (alternatives && alternatives.length) {
-            brandsList = brandsList.concat(alternatives);
+          brandsList = brandsList.concat(alternatives);
         }
 
         var storesHtml = '';
@@ -2926,15 +2927,19 @@
       var priceMap = {
         'Mango': 8000, 'Wheat': 2275, 'Rice': 2183, 'Tomato': 1500, 'Corn': 2090,
         'Apple': 7000, 'Grape': 6000, 'Potato': 1200, 'Citrus': 4000, 'Sunflower': 4500,
-        'Pepper': 5000, 'Banana': 1800, 'Sugarcane': 315, /* per quintal */ 'Cotton': 7200,
+        'Pepper': 5000, 'Banana': 1800, 'Sugarcane': 3150, 'Cotton': 7200,
         'Onion': 2000, 'Marigold': 4000, 'Pigeon Pea': 7000, 'Moong Dal': 8500,
         'Black Gram': 8000, 'Soybean': 4600, 'Jowar': 3180, 'Groundnut': 6377,
         'Harbhara': 5335, 'Bajra': 2500, 'Turmeric': 12000, 'Pomegranate': 8500,
         'Mustard': 5450, 'Indrayani Rice': 3500, 'Basmati Rice': 4500, 'Sona Masuri Rice': 3000
       };
+      
       var basePrice = priceMap[crop] || (crop.includes('Dal') || crop.includes('Pea') ? 6500 : 2500);
       var rand = Math.floor(Math.random() * (basePrice * 0.1)) - (basePrice * 0.05); // +/- 5% variation
-      var currentPrice = '₹' + Math.round(basePrice + rand) + ' / quintal';
+      var finalPrice = Math.round(basePrice + rand);
+      
+      var unit = crop === 'Sugarcane' ? 'ton' : 'quintal';
+      var currentPrice = '₹' + finalPrice + ' / ' + unit;
       var trendIcon = rand >= 0 ? '▲' : '▼';
       var trendColor = rand >= 0 ? 'var(--green)' : 'var(--red)';
 
@@ -3369,8 +3374,8 @@
           '<h3 style="margin-bottom:8px;color:var(--text);font-size:18px;">🛰️ Satellite NDVI Results</h3>' +
           '<p style="font-size:13px;color:var(--muted);line-height:1.5;">12% of the Northern field shows severe nutrient stress.</p>' +
           '<div style="position:relative;">' +
-            '<div id="satellite-map" style="height:250px; border-radius:12px; margin-top:16px; border:1px solid #cbd5e1; z-index:1;"></div>' +
-            '<button onclick="if(satelliteMap){satelliteMap.setView((window.userLat && window.userLon) ? [window.userLat, window.userLon] : [18.5204, 73.8567], 19);}" style="position:absolute; bottom:10px; right:10px; z-index:1000; background:#fff; border:none; border-radius:50%; width:36px; height:36px; box-shadow:0 2px 6px rgba(0,0,0,0.3); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Locate Me">🎯</button>' +
+          '<div id="satellite-map" style="height:250px; border-radius:12px; margin-top:16px; border:1px solid #cbd5e1; z-index:1;"></div>' +
+          '<button onclick="if(satelliteMap){satelliteMap.setView((window.userLat && window.userLon) ? [window.userLat, window.userLon] : [18.5204, 73.8567], 19);}" style="position:absolute; bottom:10px; right:10px; z-index:1000; background:#fff; border:none; border-radius:50%; width:36px; height:36px; box-shadow:0 2px 6px rgba(0,0,0,0.3); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Locate Me">🎯</button>' +
           '</div>' +
           statHtml +
           '<button class="btn btn-primary" style="margin-top:20px;width:100%;" onclick="switchTab(&apos;marketplace&apos;)">Purchase Precision Treatments</button>' +
