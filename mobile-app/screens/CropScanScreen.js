@@ -8,6 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import GradientHeader from '../components/GradientHeader';
 import { getApiBaseUrl } from '../utils/api';
+import { supabase } from '../utils/supabase';
 import axios from 'axios';
 
 const CROPS = ['Auto Detect', 'Tomato', 'Wheat', 'Rice', 'Corn', 'Apple', 'Potato', 'Grape'];
@@ -101,7 +102,23 @@ export default function CropScanScreen() {
       const payload = { image_base64: b64, ...(selectedCrop !== 'Auto Detect' && { crop_hint: selectedCrop }) };
       const response = await axios.post(`${getApiBaseUrl()}/api/v1/scan`, payload, { timeout: 300000 });
       if (response.data.success === false) throw new Error(response.data.message);
-      setAnalysis(response.data);
+      
+      const analysisData = response.data.data || response.data;
+      setAnalysis(analysisData);
+
+      // Save to Supabase silently
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user?.id) {
+        await supabase.from('scans').insert({
+          user_id: userData.user.id,
+          crop_detected: analysisData.crop_detected,
+          disease: analysisData.disease,
+          severity: analysisData.severity,
+          confidence: analysisData.confidence || analysisData.ai_confidence,
+          health_assessment: analysisData.health_assessment,
+          recommendations: analysisData.recommendations
+        });
+      }
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Analysis failed.');
     } finally {
