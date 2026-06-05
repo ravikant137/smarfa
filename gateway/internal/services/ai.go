@@ -80,33 +80,67 @@ func CallOllamaDirectly(req models.ScanRequest) ([]byte, error) {
 		return nil, fmt.Errorf("OPENAI_API_KEY is missing")
 	}
 
+	modelName := "gpt-4o"
+
 	openAIURL := "https://api.openai.com/v1/chat/completions"
-	prompt := `You are an agricultural plant disease expert.
+	
+	locationStr := ""
+	if req.Lat != 0 && req.Lon != 0 {
+		locationStr = fmt.Sprintf(" The user is located at coordinates Lat: %f, Lon: %f. Factor in regional diseases and weather for this area into your agronomy context.", req.Lat, req.Lon)
+	}
 
-Analyze the uploaded crop image carefully.
+	prompt := `You are an expert Plant & Agricultural AI Assistant with deep knowledge of crops, fruits, flowers, and ornamental plants.
+Analyze the uploaded plant image in incredible detail using a structured diagnostic approach.` + locationStr + `
 
-Return ONLY a valid JSON object matching this structure exactly:
+CRITICAL INSTRUCTIONS:
+1. You MUST identify the exact plant type — whether it is a CROP (wheat, rice, corn), a FRUIT plant (mango, papaya, strawberry, watermelon), a FLOWER/ORNAMENTAL plant (rose, marigold, jasmine, sunflower, hibiscus), or any other plant.
+2. Do NOT confuse plant types. Look closely at leaf shape, flower colour, stem structure, fruit presence, and growth form.
+3. Identify diseases, pests, and nutrient deficiencies specific to that plant type.
+4. If the image shows a flower plant, provide flower-specific disease and care advice.
+5. If the image shows a fruit plant, provide fruit-specific disease, ripening, and harvest advice.
+6. If you are unsure of the species, state the most probable genus. Only use 'Unknown Plant' as a last resort.
+
+Return ONLY a valid JSON object matching this EXACT structure:
 {
-  "crop_detected": "Crop name",
-  "disease": "Disease name (or 'Healthy')",
-  "confidence": 95.0,
+  "crop_detected": "Common Name (Scientific Name) — e.g. Rose (Rosa indica) or Papaya (Carica papaya)",
+  "plant_type": "crop", "fruit", "flower", or "ornamental",
   "severity": "healthy", "warning", or "critical",
-  "health_assessment": "Symptoms observed. If uncertain, say uncertain. Do not hallucinate.",
-  "recommendations": [
-    "Recommended pesticide: ...",
-    "Organic treatment: ...",
-    "Prevention methods: ..."
-  ]
+  "ai_confidence": 95.5,
+  "health_assessment": "High-level summary of the plant's health and appearance.",
+  "structured": {
+    "confidence_warning": "Include ONLY if image is blurry or hard to identify, else omit.",
+    "final_crop": "Common Plant Name",
+    "plant_category": "Crop / Fruit / Flower / Ornamental / Herb / Vegetable",
+    "disease": {
+      "name": "Disease Name or 'No disease detected'",
+      "confidence": "High / Medium / Low",
+      "cause": "Fungal, Bacterial, Viral, Pest, Nutrient Deficiency, or Physiological",
+      "severity": "Low, Medium, High, or Critical"
+    },
+    "safety_check": {
+      "verified": true,
+      "chemical": "Name of recommended active ingredient",
+      "safety_class": "Organic / Synthetic / Restricted",
+      "eco_status": "Safe for bees / Toxic to fish / etc.",
+      "compliance_details": "Local regulatory notes or pre-harvest intervals."
+    },
+    "treatment": {
+      "organic": "Step-by-step organic/natural treatment.",
+      "chemical": "Targeted chemical treatment if necessary.",
+      "dosage": "Exact mixing ratios (e.g. 2ml per Liter of water).",
+      "prevention": "Cultural practices to stop recurrence.",
+      "irrigation_adjustment": "Should water be increased or decreased?",
+      "soil_correction": "Fertilizer or pH changes needed.",
+      "flower_care": "For flower plants: pruning, deadheading, bloom boosting tips.",
+      "fruit_care": "For fruit plants: thinning, ripening, post-harvest tips."
+    },
+    "agent_logs": {
+      "pathology_agent": "Detailed visual symptoms observed (lesions, chlorosis, wilting, spots, etc).",
+      "agronomy_agent": "Environmental factors likely contributing to this condition.",
+      "safety_agent": "Safety precautions for the farmer or gardener."
+    }
+  }
 }`
-
-	if req.CropHint != "" {
-		prompt += fmt.Sprintf("\nHint: The farmer suspects this is a %s crop.", req.CropHint)
-	}
-
-	modelName := os.Getenv("OPENAI_MODEL")
-	if modelName == "" {
-		modelName = "gpt-4o" // Default to GPT-4o vision model
-	}
 
 	payload := map[string]interface{}{
 		"model": modelName,
@@ -172,32 +206,24 @@ Return ONLY a valid JSON object matching this structure exactly:
 	json.Unmarshal(bodyBytes, &openAIResp)
 	
 	if len(openAIResp.Choices) == 0 {
-		return nil, fmt.Errorf("No choices returned from OpenAI")
+		return nil, fmt.Errorf("No text returned from OpenAI")
 	}
 	
 	responseText := openAIResp.Choices[0].Message.Content
 
-	var aiData struct {
-		CropDetected     string  `json:"crop_detected"`
-		IsHealthy        bool    `json:"is_healthy"`
-		Disease          string  `json:"disease"`
-		Severity         string  `json:"severity"`
-		Confidence       float64 `json:"confidence"`
-		HealthAssessment string  `json:"health_assessment"`
-	}
-
-	aiData.CropDetected = "Unknown Crop"
-	aiData.Severity = "warning"
-	aiData.Confidence = 75.0
-	aiData.HealthAssessment = "Unable to fully analyze the image. Please try again."
-	_ = json.Unmarshal([]byte(responseText), &aiData)
-
-	finalResp := map[string]interface{}{
-		"crop_detected":     aiData.CropDetected,
-		"health_assessment": aiData.HealthAssessment,
-		"severity":          aiData.Severity,
-		"ai_confidence":     aiData.Confidence,
-		"success":           true,
+	var finalResp map[string]interface{}
+	
+	err = json.Unmarshal([]byte(responseText), &finalResp)
+	if err != nil {
+		finalResp = map[string]interface{}{
+			"crop_detected":     "Unknown Crop",
+			"severity":          "warning",
+			"ai_confidence":     75.0,
+			"health_assessment": "AI responded, but the output could not be parsed. Please try again.",
+			"success":           true,
+		}
+	} else {
+		finalResp["success"] = true
 	}
 
 	return json.Marshal(finalResp)
@@ -215,7 +241,9 @@ func CallOllamaForDocument(req models.ScanRequest) ([]byte, error) {
 		return nil, fmt.Errorf("OPENAI_API_KEY is missing")
 	}
 
+	modelName := "gpt-4o"
 	openAIURL := "https://api.openai.com/v1/chat/completions"
+	
 	prompt := `You are an expert agricultural assistant. Analyze the uploaded image of a document (e.g., pesticide label, fertilizer bag, prescription, or soil report).
 Extract the key information and return ONLY a valid JSON object matching this exact structure:
 {
@@ -225,11 +253,6 @@ Extract the key information and return ONLY a valid JSON object matching this ex
   "usage_instructions": "How to use the product, dosage, timing, etc.",
   "active_ingredients": "List of active ingredients"
 }`
-
-	modelName := os.Getenv("OPENAI_MODEL")
-	if modelName == "" {
-		modelName = "gpt-4o"
-	}
 
 	payload := map[string]interface{}{
 		"model": modelName,
@@ -274,7 +297,7 @@ Extract the key information and return ONLY a valid JSON object matching this ex
 	json.Unmarshal(bodyBytes, &openAIResp)
 
 	if len(openAIResp.Choices) == 0 {
-		return nil, fmt.Errorf("No choices returned from OpenAI")
+		return nil, fmt.Errorf("No text returned from OpenAI")
 	}
 
 	return []byte(openAIResp.Choices[0].Message.Content), nil

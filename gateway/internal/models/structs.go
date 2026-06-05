@@ -1,8 +1,10 @@
 package models
 
 type ScanRequest struct {
-	ImageBase64 string `json:"image_base64"`
-	CropHint    string `json:"crop_hint,omitempty"`
+	ImageBase64 string  `json:"image_base64"`
+	CropHint    string  `json:"crop_hint,omitempty"`
+	Lat         float64 `json:"lat,omitempty"`
+	Lon         float64 `json:"lon,omitempty"`
 }
 
 type AIResponse struct {
