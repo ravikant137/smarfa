@@ -2623,6 +2623,46 @@
       ]
     };
 
+    CROP_DATA['Bajra'] = {
+      icon: '🌾', days: 85, soil: 'Sandy / Light Soils', water: 'Very Low (Highly Drought Tolerant)', sunlight: 'Full Sun', yield: '8–10 quintals/acre',
+      stages: [
+        { name: 'Sowing', icon: '🪛', days: 'Day 1–10', color: '#8B5E3C', water: 'Sow with onset of monsoon', fertilizer: 'Basal Nitrogen + Phosphorus', pest: 'White Grub', disease: 'Ergot', tip: 'Sow at shallow depth (2-3 cm). Excellent crop for low rainfall areas.' },
+        { name: 'Tillering & Vegetative', icon: '🌱', days: 'Day 11–40', color: '#6ab04c', water: 'Rainfed', fertilizer: 'Top dress Urea at 30 days', pest: 'Shoot Fly', disease: 'Downy Mildew (Green Ear)', tip: 'Thinning at 15 days is essential to maintain plant population and reduce moisture competition.' },
+        { name: 'Booting & Flowering', icon: '🌸', days: 'Day 41–60', color: '#d4952a', water: 'Irrigate if prolonged dry spell', fertilizer: 'None', pest: 'Stem Borer', disease: 'Smut', tip: 'Most sensitive stage to moisture stress. Downy mildew infected "green ears" should be uprooted.' },
+        { name: 'Grain Filling & Harvest', icon: '🌻', days: 'Day 61–85', color: '#c0392b', water: 'None', fertilizer: 'None', pest: 'Birds', disease: 'Rust', tip: 'Harvest when the grains are hard and cannot be crushed between fingers.' }
+      ]
+    };
+
+    CROP_DATA['Turmeric'] = {
+      icon: '🌿', days: 240, soil: 'Well-drained Loamy Soil', water: 'High', sunlight: 'Partial to Full Sun', yield: '20–25 tons/acre (Fresh)',
+      stages: [
+        { name: 'Rhizome Planting', icon: '🪛', days: 'Month 1–2', color: '#8B5E3C', water: 'Irrigate immediately after planting', fertilizer: 'Heavy FYM + Basal NPK', pest: 'Rhizome Scale', disease: 'Rhizome Rot', tip: 'Use disease-free seed rhizomes. Treat with Trichoderma before planting on raised beds.' },
+        { name: 'Sprouting & Tillering', icon: '🌱', days: 'Month 3–4', color: '#6ab04c', water: 'Every 7–10 days', fertilizer: 'Urea top dress + Earthing up', pest: 'Shoot Borer', disease: 'Leaf Blotch', tip: 'Earthing up is critical to prevent exposure of developing rhizomes to sunlight.' },
+        { name: 'Rhizome Development', icon: '🌿', days: 'Month 5–7', color: '#3d7a3a', water: 'Critical moisture required', fertilizer: 'Potassium is highly required', pest: 'Thrips', disease: 'Leaf Spot', tip: 'Do not allow the field to dry out. Weed control is essential as turmeric is a slow grower.' },
+        { name: 'Maturation & Harvest', icon: '🍂', days: 'Month 8–9', color: '#e8a838', water: 'Stop watering 1 month prior', fertilizer: 'None', pest: 'Nematodes', disease: 'Rhizome Rot', tip: 'Harvest when leaves turn yellow and dry completely. Boil and dry the rhizomes for market.' }
+      ]
+    };
+
+    CROP_DATA['Pomegranate'] = {
+      icon: '🍎', days: 365, soil: 'Light Well Drained / Sandy Loam', water: 'Low-Moderate', sunlight: 'Full Sun', yield: '10–12 tons/acre',
+      stages: [
+        { name: 'Resting & Pruning', icon: '✂️', days: 'Month 1–2', color: '#8B5E3C', water: 'Withhold water to induce stress (Bahar)', fertilizer: 'FYM + NPK before watering resumes', pest: 'Shot Hole Borer', disease: 'Bacterial Blight', tip: 'Stress period (Bahar treatment) drops leaves and synchronizes flowering. Prune dead wood.' },
+        { name: 'Flowering & Fruit Set', icon: '🌸', days: 'Month 3–4', color: '#d4952a', water: 'Resume watering lightly, then increase', fertilizer: 'Micronutrients (Zinc, Boron)', pest: 'Thrips, Aphids', disease: 'Anthracnose', tip: 'Avoid heavy watering immediately after stress, it causes flower drop.' },
+        { name: 'Fruit Development', icon: '🟢', days: 'Month 5–7', color: '#6ab04c', water: 'Drip irrigation regularly', fertilizer: 'High Potassium + Calcium', pest: 'Fruit Borer (Anar Butterfly)', disease: 'Bacterial Blight (Telya)', tip: 'Bagging fruits protects from borers, sunburn, and improves color and quality.' },
+        { name: 'Ripening & Harvest', icon: '🔴', days: 'Month 8–9', color: '#c0392b', water: 'Consistent moisture', fertilizer: 'None', pest: 'Fruit Sucking Moth', disease: 'Fruit Rot, Cracking', tip: 'Sudden changes in soil moisture cause fruit cracking. Harvest when the rind turns deep red.' }
+      ]
+    };
+
+    CROP_DATA['Mustard'] = {
+      icon: '🌼', days: 120, soil: 'Sandy Loam', water: 'Low (Rabi crop)', sunlight: 'Full Sun', yield: '8–10 quintals/acre',
+      stages: [
+        { name: 'Sowing', icon: '🪛', days: 'Day 1–15', color: '#8B5E3C', water: 'Pre-sowing irrigation', fertilizer: 'Basal NPK + Sulphur', pest: 'Painted Bug', disease: 'Seed Rot', tip: 'Sulphur application (20 kg/acre) significantly increases oil content.' },
+        { name: 'Vegetative Growth', icon: '🌿', days: 'Day 16–45', color: '#3d7a3a', water: 'First irrigation at 30 days', fertilizer: 'Nitrogen top dress', pest: 'Aphids', disease: 'White Rust', tip: 'Thinning at 15-20 days is crucial to maintain 15 cm distance between plants.' },
+        { name: 'Flowering', icon: '🌼', days: 'Day 46–75', color: '#d4952a', water: 'Second irrigation at pod formation', fertilizer: 'None', pest: 'Mustard Aphid', disease: 'Alternaria Blight', tip: 'Aphids are the biggest threat. Monitor and spray Dimethoate if aphid population crosses threshold.' },
+        { name: 'Pod Maturation & Harvest', icon: '🌾', days: 'Day 76–120', color: '#c0392b', water: 'None', fertilizer: 'None', pest: 'Birds', disease: 'Powdery Mildew', tip: 'Harvest when 75% of the pods turn yellow to prevent shattering in the field.' }
+      ]
+    };
+
 
 
     // ── PULSES & LEGUMES ────────────────────────
