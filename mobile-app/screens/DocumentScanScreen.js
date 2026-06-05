@@ -8,7 +8,6 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import GradientHeader from '../components/GradientHeader';
 import { getApiBaseUrl } from '../utils/api';
-import { supabase } from '../utils/supabase';
 import axios from 'axios';
 
 const CROPS = ['Auto Detect', 'Tomato', 'Wheat', 'Rice', 'Corn', 'Apple', 'Potato', 'Grape'];
@@ -103,19 +102,6 @@ export default function DocumentScanScreen() {
       
       const analysisData = response.data.data || response.data;
       setAnalysis(analysisData);
-
-      // Save to Supabase silently
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData?.user?.id) {
-        await supabase.from('scans').insert({
-          user_id: userData.user.id,
-          document_type: analysisData.document_type || 'Document Analyzed',
-          extracted_text: analysisData.extracted_text,
-          usage_instructions: analysisData.usage_instructions,
-          warnings: analysisData.warnings,
-          active_ingredients: analysisData.active_ingredients
-        });
-      }
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Analysis failed.');
     } finally {
