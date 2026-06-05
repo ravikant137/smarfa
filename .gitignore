@@ -21,3 +21,7 @@ smartfarm-ai/model/*.tflite
 *.key
 certs/
 secrets/
+
+# OS generated files
+.DS_Store
+**/.DS_Store
