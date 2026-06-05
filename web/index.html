@@ -2552,6 +2552,47 @@
       ]
     };
 
+    CROP_DATA['Soybean'] = {
+      icon: '🌿', days: 100, soil: 'Well Drained Loamy', water: 'Moderate', sunlight: 'Full Sun', yield: '10–15 quintals/acre',
+      stages: [
+        { name: 'Sowing & Germination', icon: '🪛', days: 'Day 1–10', color: '#8B5E3C', water: 'Sow in moist soil', fertilizer: 'Seed treatment with Rhizobium', pest: 'Stem Fly, White Grub', disease: 'Seed Rot', tip: 'Sow at 3–4 cm depth. Wait for good monsoon showers before sowing.' },
+        { name: 'Vegetative Growth', icon: '🌱', days: 'Day 11–45', color: '#6ab04c', water: 'Rainfed (irrigate if dry spell > 15 days)', fertilizer: 'Basal DAP + Sulphur', pest: 'Girdle Beetle, Tobacco Caterpillar', disease: 'Yellow Mosaic Virus', tip: 'Sulphur application improves oil content. Control whitefly to prevent YMV.' },
+        { name: 'Flowering', icon: '🌸', days: 'Day 46–65', color: '#d4952a', water: 'Critical: avoid moisture stress', fertilizer: 'Foliar NPK (19:19:19) if weak', pest: 'Leaf Miner, Pod Borer', disease: 'Rust, Anthracnose', tip: 'Flowers are very sensitive to high heat and water stress (causes flower drop).' },
+        { name: 'Pod Filling', icon: '🫛', days: 'Day 66–85', color: '#e8a838', water: 'Critical for grain weight', fertilizer: 'Potassium spray', pest: 'Pod Borer', disease: 'Charcoal Rot', tip: 'Ensure soil moisture is adequate. Drought here severely reduces yield.' },
+        { name: 'Maturity & Harvest', icon: '🌾', days: 'Day 86–100', color: '#c0392b', water: 'None', fertilizer: 'None', pest: 'Rats', disease: 'Pod Blight', tip: 'Harvest when leaves turn yellow and drop off, and pods turn brown.' }
+      ]
+    };
+
+    CROP_DATA['Jowar'] = {
+      icon: '🌾', days: 110, soil: 'Black Cotton / Clay Loam', water: 'Low (Drought Tolerant)', sunlight: 'Full Sun', yield: '12–15 quintals/acre',
+      stages: [
+        { name: 'Seedling', icon: '🪛', days: 'Day 1–20', color: '#8B5E3C', water: 'Sow in moist soil', fertilizer: 'Basal NPK', pest: 'Shoot Fly', disease: 'Seed Rot', tip: 'Shoot fly attacks early; sow early or treat seeds with imidacloprid.' },
+        { name: 'Vegetative (Grand Growth)', icon: '🌿', days: 'Day 21–55', color: '#3d7a3a', water: 'Rainfed', fertilizer: 'Nitrogen top dress at 30 days', pest: 'Stem Borer', disease: 'Downy Mildew', tip: 'Very resilient to dry spells but benefits from weeding during first 30 days.' },
+        { name: 'Booting & Heading', icon: '🌾', days: 'Day 56–75', color: '#d4952a', water: 'Critical moisture stage', fertilizer: 'None', pest: 'Earhead Bug', disease: 'Ergot, Smut', tip: 'Avoid water stress when the panicle is emerging from the boot.' },
+        { name: 'Grain Filling & Harvest', icon: '🌻', days: 'Day 76–110', color: '#c0392b', water: 'None', fertilizer: 'None', pest: 'Birds, Grain Midge', disease: 'Grain Mold', tip: 'Harvest when grains are hard and moisture is around 15%.' }
+      ]
+    };
+
+    CROP_DATA['Groundnut'] = {
+      icon: '🥜', days: 110, soil: 'Sandy Loam / Loose Soil', water: 'Moderate', sunlight: 'Full Sun', yield: '8–12 quintals/acre',
+      stages: [
+        { name: 'Sowing', icon: '🪛', days: 'Day 1–15', color: '#8B5E3C', water: 'Pre-sowing irrigation', fertilizer: 'Basal NPK + Gypsum', pest: 'White Grub', disease: 'Collar Rot', tip: 'Treat seeds with Trichoderma. Gypsum application is crucial for pod formation.' },
+        { name: 'Vegetative & Flowering', icon: '🌸', days: 'Day 16–45', color: '#3d7a3a', water: 'Irrigate every 10–12 days', fertilizer: 'None', pest: 'Leaf Miner, Aphids', disease: 'Tikka Disease (Leaf Spot)', tip: 'Flowering starts around day 30. Spray for Tikka disease if spots appear.' },
+        { name: 'Pegging (Needle Formation)', icon: '🌱', days: 'Day 46–65', color: '#d4952a', water: 'Critical: soil must be moist & loose', fertilizer: 'Calcium (Gypsum top dress)', pest: 'Spodoptera', disease: 'Rust', tip: 'Do NOT cultivate or weed during pegging—pegs must enter soil undisturbed.' },
+        { name: 'Pod Development & Harvest', icon: '🥜', days: 'Day 66–110', color: '#c0392b', water: 'Stop 15 days before harvest', fertilizer: 'None', pest: 'Rats', disease: 'Aflatoxin (if stored wet)', tip: 'Harvest when inner shell turns dark/brown. Dry pods to 8% moisture to prevent Aflatoxin.' }
+      ]
+    };
+
+    CROP_DATA['Harbhara'] = {
+      icon: '🌱', days: 105, soil: 'Medium to Heavy Black Soil', water: 'Low (Rabi Crop)', sunlight: 'Full Sun', yield: '8–10 quintals/acre',
+      stages: [
+        { name: 'Sowing & Germination', icon: '🪛', days: 'Day 1–15', color: '#8B5E3C', water: 'Pre-sowing irrigation', fertilizer: 'Basal NPK + Rhizobium', pest: 'Cutworms', disease: 'Wilt', tip: 'Deep sowing (8-10 cm) helps utilize residual soil moisture and prevents wilt.' },
+        { name: 'Vegetative & Branching', icon: '🌿', days: 'Day 16–45', color: '#3d7a3a', water: 'Usually grown on residual moisture', fertilizer: 'None', pest: 'Aphids', disease: 'Collar Rot', tip: 'Nipping (plucking top shoots) at 30 days encourages branching and more pods.' },
+        { name: 'Flowering & Pod Setting', icon: '🌸', days: 'Day 46–75', color: '#d4952a', water: 'Irrigate once at pre-flowering if dry', fertilizer: 'Foliar 2% Urea if weak', pest: 'Pod Borer (Helicoverpa armigera)', disease: 'Ascochyta Blight', tip: 'Pod borer is the biggest threat. Monitor with pheromone traps and spray Neem Extract.' },
+        { name: 'Maturation & Harvest', icon: '🫛', days: 'Day 76–105', color: '#c0392b', water: 'None', fertilizer: 'None', pest: 'Bruchid beetles (storage)', disease: 'Dry Root Rot', tip: 'Harvest when leaves turn yellow and drop, and pods are dry and rattling.' }
+      ]
+    };
+
 
 
     // ── PULSES & LEGUMES ────────────────────────
