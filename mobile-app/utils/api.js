@@ -2,7 +2,12 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 export const getApiBaseUrl = () => {
-  // When running in a browser (web platform), always use localhost
+  // When running on Vercel or in production web, use relative paths so it hits Vercel's /api folder directly
+  if (Platform.OS === 'web' && process.env.NODE_ENV === 'production') {
+    return '';
+  }
+
+  // When running locally in browser (web platform), always use localhost
   if (Platform.OS === 'web') {
     return 'http://127.0.0.1:8000';
   }
