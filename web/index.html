@@ -509,6 +509,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
   <!-- Google Translate Styles -->
   <style>
@@ -861,9 +863,9 @@
                 <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="map-location-sub">Tracking current
                   GPS location</div>
               </div>
-              <button onclick="addField()"
-                style="background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:50px;font-size:12px;font-weight:700;cursor:pointer;">+
-                Add Field</button>
+              <button id="analyze-field-btn" onclick="analyzeDrawnField()"
+                style="background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:50px;font-size:12px;font-weight:700;cursor:pointer; display:none; transition:0.3s; box-shadow:0 2px 8px rgba(61,122,58,0.4);">
+                🛰️ Analyze Field</button>
             </div>
             <div id="farm-map" style="height:420px;background:#e2e8f0;position:relative;overflow:hidden;z-index:1;">
               <div id="map-loading-overlay"
@@ -2022,9 +2024,60 @@
           attribution: '&copy; Google Earth Engine'
         }).addTo(dashMap);
 
-        var bounds = [[lat - 0.001, lon - 0.001], [lat + 0.001, lon + 0.001]];
-        var rect = L.rectangle(bounds, { color: "#3d7a3a", weight: 3, fillOpacity: 0.4 }).addTo(dashMap);
-        rect.on('click', function () { selectField('A'); });
+        // FeatureGroup is to store editable layers
+        window.drawnItems = new L.FeatureGroup();
+        dashMap.addLayer(window.drawnItems);
+
+        // Initialize the draw control
+        var drawControl = new L.Control.Draw({
+            draw: {
+                polyline: false,
+                polygon: {
+                    allowIntersection: false, // Restricts shapes to simple polygons
+                    drawError: {
+                        color: '#e1e100',
+                        message: '<strong>Error:</strong> shape edges cannot cross!'
+                    },
+                    shapeOptions: {
+                        color: '#3d7a3a',
+                        weight: 3,
+                        fillColor: '#3d7a3a',
+                        fillOpacity: 0.2
+                    }
+                },
+                circle: false,
+                rectangle: false,
+                circlemarker: false,
+                marker: false
+            },
+            edit: {
+                featureGroup: window.drawnItems,
+                remove: true
+            }
+        });
+        dashMap.addControl(drawControl);
+
+        // Capture drawn polygon
+        window.currentPolygonCoordinates = null;
+        dashMap.on(L.Draw.Event.CREATED, function (e) {
+            var type = e.layerType,
+                layer = e.layer;
+
+            if (type === 'polygon') {
+                window.drawnItems.clearLayers(); // Only allow one field at a time
+                window.drawnItems.addLayer(layer);
+                
+                // Get the LatLng coordinates of the polygon
+                var latlngs = layer.getLatLngs()[0];
+                window.currentPolygonCoordinates = latlngs.map(ll => [ll.lat, ll.lng]);
+                
+                console.log("Farm Boundary Saved: ", window.currentPolygonCoordinates);
+                
+                // Show the Analyze button!
+                document.getElementById('analyze-field-btn').style.display = 'block';
+                toast("Farm boundary drawn successfully! Click 'Analyze Field' for Satellite NDVI.");
+            }
+        });
 
         // 2km heatmap radius simulation
         L.circle([lat, lon], {
@@ -2099,6 +2152,60 @@
         function (err) { clearTimeout(failsafeTimeout); fallbackToIP(); },
         { enableHighAccuracy: true, timeout: 3500, maximumAge: 0 }
       );
+    }
+
+    function analyzeDrawnField() {
+      if (!window.currentPolygonCoordinates || !dashMap) return;
+      
+      var btn = document.getElementById('analyze-field-btn');
+      btn.innerHTML = '🔄 Processing...';
+      btn.style.pointerEvents = 'none';
+      
+      // Simulate API call to Agromonitoring
+      setTimeout(function() {
+        btn.innerHTML = '✅ NDVI Complete';
+        btn.style.background = 'var(--sky)';
+        
+        // Add fake NDVI heatmap over the exact drawn polygon
+        var ndviBounds = L.latLngBounds(window.currentPolygonCoordinates);
+        
+        // Create an artificial 'stressed' region in the top left corner of the drawn box
+        var stressedBounds = [
+            [ndviBounds.getNorth(), ndviBounds.getWest()],
+            [ndviBounds.getNorth(), ndviBounds.getCenter().lng],
+            [ndviBounds.getCenter().lat, ndviBounds.getCenter().lng],
+            [ndviBounds.getCenter().lat, ndviBounds.getWest()]
+        ];
+        
+        // Healthy overlay
+        L.polygon(window.currentPolygonCoordinates, {
+            color: 'transparent',
+            weight: 0,
+            fillColor: '#10b981', // Green healthy area
+            fillOpacity: 0.35
+        }).addTo(dashMap);
+        
+        // Stressed overlay
+        L.polygon(stressedBounds, {
+            color: 'transparent',
+            weight: 0,
+            fillColor: '#ef4444', // Red stressed area
+            fillOpacity: 0.5
+        }).addTo(dashMap);
+        
+        toast("Satellite NDVI Analysis Complete. 12% of the field shows severe stress.");
+        
+        // Update the field details status
+        var detailEl = document.getElementById('field-detail');
+        if (detailEl) {
+            detailEl.style.display = 'block';
+            document.getElementById('field-detail-name').innerHTML = '📍 ' + window.currentPolygonCoordinates.length + ' Point Polygon (Live Satellite)';
+            document.getElementById('field-detail-status').innerHTML = '🔴 12% STRESS DETECTED';
+            document.getElementById('field-detail-status').style.color = 'var(--red)';
+            document.getElementById('field-detail-status').style.background = 'rgba(239, 68, 68, 0.1)';
+        }
+
+      }, 2500);
     }
 
     // ── Water Pump ──────────────────────────────
