@@ -831,6 +831,10 @@
           <div id="weather-days" style="display:flex; justify-content:space-between; gap:12px; overflow-x:auto; padding-bottom:8px; scrollbar-width:none; white-space:nowrap;">
             <!-- Weather days injected here -->
           </div>
+          <div id="weather-impact-container" style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px; display:none;">
+            <div style="font-size:12px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">🤖 AI Agronomy Impact Analysis</div>
+            <div id="weather-impact-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+          </div>
         </div>
 
         <!-- Main Row: Map + Sidebar -->
@@ -1454,6 +1458,43 @@
               </div>
             `;
             daysDiv.innerHTML += cardHTML;
+          }
+
+          // --- AI Agronomy Impact Analysis ---
+          var max3DaysTemp = -99;
+          var min3DaysTemp = 99;
+          var max3DaysRain = 0;
+          
+          for(let i=0; i < Math.min(3, data.daily.time.length); i++) {
+            if (data.daily.temperature_2m_max[i] > max3DaysTemp) max3DaysTemp = data.daily.temperature_2m_max[i];
+            if (data.daily.temperature_2m_min[i] < min3DaysTemp) min3DaysTemp = data.daily.temperature_2m_min[i];
+            if (data.daily.precipitation_probability_max[i] > max3DaysRain) max3DaysRain = data.daily.precipitation_probability_max[i];
+          }
+
+          var impacts = [];
+          if (max3DaysRain > 50) {
+            impacts.push(`<div style="background:rgba(192, 57, 43, 0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌧️ High Rain Risk (${Math.round(max3DaysRain)}%):</strong> Delay pesticide and foliar fertilizer sprays. High risk of fungal diseases (e.g., Blight, Mildew) in broadleaf crops. Ensure field drainage pathways are clear.</div>`);
+          } else if (max3DaysRain > 20) {
+            impacts.push(`<div style="background:rgba(212, 149, 42, 0.05); border-left:3px solid var(--yellow); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌦️ Light Rain Possible:</strong> Monitor soil moisture before running irrigation. Minor pest activity might increase due to humidity.</div>`);
+          }
+
+          if (max3DaysTemp > 35) {
+            impacts.push(`<div style="background:rgba(192, 57, 43, 0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌡️ Heat Stress Alert:</strong> Max temp hitting ${Math.round(max3DaysTemp)}°C. High risk of flower drop in Tomatoes and Cotton. Increase irrigation frequency (prefer early morning).</div>`);
+          }
+          
+          if (min3DaysTemp < 10) {
+            impacts.push(`<div style="background:rgba(44, 154, 219, 0.05); border-left:3px solid #2c9adb; padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>❄️ Cold Snap Alert:</strong> Min temp dropping to ${Math.round(min3DaysTemp)}°C. Risk of frost damage to young seedlings. Consider light evening irrigation to retain soil warmth overnight.</div>`);
+          }
+
+          if (impacts.length === 0) {
+             impacts.push(`<div style="background:rgba(61, 122, 58, 0.05); border-left:3px solid var(--green); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>✅ Optimal Conditions:</strong> Weather is stable. Excellent window for fertilizer application, pruning, and standard irrigation cycles.</div>`);
+          }
+
+          var impactDiv = document.getElementById('weather-impact-container');
+          var impactList = document.getElementById('weather-impact-list');
+          if (impactDiv && impactList) {
+            impactList.innerHTML = impacts.join('');
+            impactDiv.style.display = 'block';
           }
 
           if (rainAlert) {
