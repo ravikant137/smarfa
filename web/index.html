@@ -805,7 +805,7 @@
 
         <!-- Market Prices Marquee/Widget -->
         <div
-          style="background:#fff; border-radius:16px; padding:16px 20px; border:1px solid var(--border); box-shadow:0 2px 12px rgba(0,0,0,0.05); margin-bottom:24px; display:flex; align-items:center; gap:16px; overflow:hidden;">
+          style="background:#fff; border-radius:16px; padding:16px 20px; border:1px solid var(--border); box-shadow:0 2px 12px rgba(0,0,0,0.05); margin-bottom:16px; display:flex; align-items:center; gap:16px; overflow:hidden;">
           <div
             style="font-weight:800; color:var(--text); white-space:nowrap; display:flex; align-items:center; gap:6px;">
             <span>📈 Market Prices near <span id="market-location"
@@ -818,6 +818,19 @@
           <div id="market-ticker"
             style="display:flex; gap:16px; overflow-x:auto; white-space:nowrap; scrollbar-width:none; width:100%; align-items:center;">
             <span style="color:var(--muted); font-size:13px;">Fetching latest APMC Mandi rates...</span>
+          </div>
+        </div>
+
+        <!-- 7-Day Weather Forecast Widget -->
+        <div id="weather-forecast-container" style="background: linear-gradient(135deg, #5ba4cf 0%, #3a7ca5 100%); border-radius:16px; padding:20px; margin-bottom:24px; color:white; box-shadow:0 4px 15px rgba(91,164,207,0.3); display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div style="font-weight:800; font-size:18px; display:flex; align-items:center; gap:8px;">
+              <span>🌤️</span> <span>Local Weather Forecast</span>
+            </div>
+            <div style="font-size:12px; opacity:0.9; background:rgba(255,255,255,0.2); padding:4px 10px; border-radius:20px;">Powered by Open-Meteo</div>
+          </div>
+          <div id="weather-days" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:8px; scrollbar-width:none; white-space:nowrap;">
+            <!-- Weather days injected here -->
           </div>
         </div>
 
@@ -1380,10 +1393,84 @@
       API = 'http://192.168.29.181:8000';
     }
 
+    function fetchWeatherForecast(lat, lon) {
+      var url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`;
+      
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if(!data || !data.daily) return;
+          
+          // Update Dashboard Current Stats
+          if(data.current) {
+            document.getElementById('s-temp').textContent = Math.round(data.current.temperature_2m) + '°C';
+            document.getElementById('s-temp-sub').textContent = 'Current Temp';
+            document.getElementById('s-moisture').textContent = data.current.relative_humidity_2m + '%';
+            document.getElementById('s-moisture-sub').textContent = 'Humidity';
+          }
+
+          var container = document.getElementById('weather-forecast-container');
+          var daysDiv = document.getElementById('weather-days');
+          container.style.display = 'block';
+          daysDiv.innerHTML = '';
+          
+          var rainAlert = false;
+          var rainDays = [];
+          
+          const getIcon = (code) => {
+            if(code <= 1) return '☀️'; // Clear
+            if(code <= 3) return '⛅'; // Partly cloudy
+            if(code <= 48) return '🌫️'; // Fog
+            if(code <= 67) return '🌧️'; // Rain
+            if(code <= 77) return '❄️'; // Snow
+            if(code <= 82) return '🌦️'; // Showers
+            if(code >= 95) return '⛈️'; // Thunderstorm
+            return '☁️';
+          };
+
+          const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+          for(let i=0; i < Math.min(7, data.daily.time.length); i++) {
+            var dateStr = data.daily.time[i];
+            var dateObj = new Date(dateStr);
+            var dayName = i === 0 ? 'Today' : (i === 1 ? 'Tmrw' : daysOfWeek[dateObj.getDay()]);
+            
+            var maxT = Math.round(data.daily.temperature_2m_max[i]);
+            var minT = Math.round(data.daily.temperature_2m_min[i]);
+            var rainProb = data.daily.precipitation_probability_max[i];
+            var icon = getIcon(data.daily.weather_code[i]);
+            
+            if (i > 0 && i <= 3 && rainProb > 50) {
+              rainAlert = true;
+              rainDays.push(dayName);
+            }
+
+            var cardHTML = `
+              <div style="background:rgba(255,255,255,0.15); border-radius:12px; padding:12px; min-width:80px; text-align:center; backdrop-filter:blur(5px); border:1px solid rgba(255,255,255,0.2);">
+                <div style="font-size:12px; font-weight:700; margin-bottom:8px; opacity:0.9;">${dayName}</div>
+                <div style="font-size:28px; margin-bottom:8px;">${icon}</div>
+                <div style="font-size:14px; font-weight:800;">${maxT}°</div>
+                <div style="font-size:11px; opacity:0.7;">${minT}°</div>
+                <div style="font-size:10px; font-weight:700; color:#cce8ff; margin-top:6px; background:rgba(0,0,0,0.1); padding:2px; border-radius:4px;">💧 ${rainProb}%</div>
+              </div>
+            `;
+            daysDiv.innerHTML += cardHTML;
+          }
+
+          if (rainAlert) {
+            setTimeout(() => {
+              toast(`🌦️ Weather Alert: High chance of rain expected on ${rainDays.join(' and ')}. Please plan irrigation accordingly!`, 'warning');
+            }, 3000);
+          }
+        })
+        .catch(e => console.error("Weather fetch error:", e));
+    }
+
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(function (position) {
         window.userLat = position.coords.latitude;
         window.userLon = position.coords.longitude;
+        fetchWeatherForecast(window.userLat, window.userLon);
       });
     }
 
