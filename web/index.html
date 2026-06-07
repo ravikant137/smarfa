@@ -511,6 +511,11 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <!-- Smarfa Modules -->
+  <script src="/js/config.js"></script>
+  <script src="/js/weather.js"></script>
+  <script src="/js/satellite.js"></script>
+  <script src="/js/dashboard.js"></script>
 
   <!-- Google Translate Styles -->
   <style>
@@ -882,19 +887,19 @@
               </div>
               <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
                 <div style="text-align:center;padding:10px;background:var(--card);border-radius:10px;">
-                  <div style="font-size:18px;margin-bottom:4px;" id="field-detail-icon">🌾</div>
+                  <div style="font-size:18px;margin-bottom:4px;" id="field-detail-icon">🌍</div>
                   <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">CROP</div>
-                  <div style="font-size:13px;font-weight:700;" id="field-detail-crop">Wheat</div>
+                  <div style="font-size:13px;font-weight:700;" id="field-detail-crop">Not Set</div>
                 </div>
                 <div style="text-align:center;padding:10px;background:var(--card);border-radius:10px;">
                   <div style="font-size:18px;margin-bottom:4px;">📐</div>
                   <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">AREA</div>
-                  <div style="font-size:13px;font-weight:700;" id="field-detail-area">4.2 acres</div>
+                  <div style="font-size:13px;font-weight:700;" id="field-detail-area">—</div>
                 </div>
                 <div style="text-align:center;padding:10px;background:var(--card);border-radius:10px;">
-                  <div style="font-size:18px;margin-bottom:4px;">📅</div>
-                  <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">PLANTED</div>
-                  <div style="font-size:13px;font-weight:700;" id="field-detail-planted">Jan 12</div>
+                  <div style="font-size:18px;margin-bottom:4px;">📊</div>
+                  <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">SOIL MOISTURE</div>
+                  <div style="font-size:13px;font-weight:700;" id="field-detail-planted">—</div>
                 </div>
               </div>
               <button onclick="switchTab('scan')"
@@ -1403,12 +1408,8 @@
   </footer>
 
   <script>
-    let API = window.location.origin;
-    if (!API || API === 'null' || API.startsWith('file://')) {
-      API = 'http://192.168.29.181:8000';
-    }
-
-    var AGRO_API_KEY = "8518d290ab4e6f4ca86ee6c7d841b3fb";
+    let API = (window.APP && window.APP.API) ? window.APP.API : (window.location.origin && !window.location.origin.startsWith('file://') ? window.location.origin : 'http://192.168.29.181:8000');
+    var AGRO_API_KEY = '8518d290ab4e6f4ca86ee6c7d841b3fb';
 
     function fetchAgroWeather(lat, lon) {
       // Agromonitoring current weather API - field-specific, more agricultural
@@ -1595,11 +1596,14 @@
         .catch(e => console.error("Weather fetch error:", e));
     }
 
-    if ("geolocation" in navigator) {
+    if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(function (position) {
         window.userLat = position.coords.latitude;
         window.userLon = position.coords.longitude;
-        fetchWeatherForecast(window.userLat, window.userLon);
+        if (window.APP) { window.APP.userLat = window.userLat; window.APP.userLon = window.userLon; }
+        // Use modular weather fetch (weather.js)
+        if (window.fetchWeatherData) window.fetchWeatherData(window.userLat, window.userLon);
+        else fetchWeatherForecast(window.userLat, window.userLon);
       });
     }
 
