@@ -2161,51 +2161,98 @@
       btn.innerHTML = '🔄 Processing...';
       btn.style.pointerEvents = 'none';
       
-      // Simulate API call to Agromonitoring
-      setTimeout(function() {
-        btn.innerHTML = '✅ NDVI Complete';
-        btn.style.background = 'var(--sky)';
-        
-        // Add fake NDVI heatmap over the exact drawn polygon
-        var ndviBounds = L.latLngBounds(window.currentPolygonCoordinates);
-        
-        // Create an artificial 'stressed' region in the top left corner of the drawn box
-        var stressedBounds = [
-            [ndviBounds.getNorth(), ndviBounds.getWest()],
-            [ndviBounds.getNorth(), ndviBounds.getCenter().lng],
-            [ndviBounds.getCenter().lat, ndviBounds.getCenter().lng],
-            [ndviBounds.getCenter().lat, ndviBounds.getWest()]
-        ];
-        
-        // Healthy overlay
-        L.polygon(window.currentPolygonCoordinates, {
-            color: 'transparent',
-            weight: 0,
-            fillColor: '#10b981', // Green healthy area
-            fillOpacity: 0.35
-        }).addTo(dashMap);
-        
-        // Stressed overlay
-        L.polygon(stressedBounds, {
-            color: 'transparent',
-            weight: 0,
-            fillColor: '#ef4444', // Red stressed area
-            fillOpacity: 0.5
-        }).addTo(dashMap);
-        
-        toast("Satellite NDVI Analysis Complete. 12% of the field shows severe stress.");
-        
-        // Update the field details status
-        var detailEl = document.getElementById('field-detail');
-        if (detailEl) {
-            detailEl.style.display = 'block';
-            document.getElementById('field-detail-name').innerHTML = '📍 ' + window.currentPolygonCoordinates.length + ' Point Polygon (Live Satellite)';
-            document.getElementById('field-detail-status').innerHTML = '🔴 12% STRESS DETECTED';
-            document.getElementById('field-detail-status').style.color = 'var(--red)';
-            document.getElementById('field-detail-status').style.background = 'rgba(239, 68, 68, 0.1)';
-        }
+      var AGRO_API_KEY = "8518d290ab4e6f4ca86ee6c7d841b3fb";
+      
+      // 1. Convert our polygon to GeoJSON format (Lon, Lat)
+      var geoJsonCoords = window.currentPolygonCoordinates.map(ll => [ll[1], ll[0]]);
+      // Close the polygon for GeoJSON valid formatting
+      geoJsonCoords.push(geoJsonCoords[0]);
+      
+      var polygonData = {
+          "name": "Smarfa Field " + Date.now(),
+          "geo_json": {
+              "type": "Feature",
+              "properties": {},
+              "geometry": {
+                  "type": "Polygon",
+                  "coordinates": [geoJsonCoords]
+              }
+          }
+      };
 
-      }, 2500);
+      // 2. Register Polygon to get ID
+      fetch("https://api.agromonitoring.com/agro/1.0/polygons?appid=" + AGRO_API_KEY, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(polygonData)
+      })
+      .then(res => res.json())
+      .then(polyResponse => {
+          if(!polyResponse || !polyResponse.id) {
+              throw new Error("Failed to register polygon with Agromonitoring.");
+          }
+          var polyId = polyResponse.id;
+          
+          // 3. Search for the latest Satellite Imagery (NDVI) within the last 90 days
+          var endUnix = Math.floor(Date.now() / 1000);
+          var startUnix = endUnix - (90 * 24 * 60 * 60);
+          
+          return fetch(`https://api.agromonitoring.com/agro/1.0/image/search?start=${startUnix}&end=${endUnix}&polyid=${polyId}&appid=${AGRO_API_KEY}`);
+      })
+      .then(res => res.json())
+      .then(images => {
+          if (!images || images.length === 0) {
+              toast("No recent cloud-free satellite imagery found for this area.", "error");
+              btn.innerHTML = '🛰️ Analyze Field';
+              btn.style.pointerEvents = 'auto';
+              return;
+          }
+          
+          // Get the most recent image
+          images.sort((a,b) => b.dt - a.dt);
+          var latestImage = images[0];
+
+          btn.innerHTML = '✅ NDVI Complete';
+          btn.style.background = 'var(--sky)';
+
+          // 4. Overlay the TrueColor and NDVI tiles onto the Leaflet map!
+          // Note: API tile URLs already include {z}/{x}/{y} format compatible with Leaflet
+          var ndviTileUrl = latestImage.tile.ndvi + "?appid=" + AGRO_API_KEY;
+          
+          // Remove the editable drawn shapes
+          window.drawnItems.clearLayers();
+          
+          // Draw a solid white outline of the polygon
+          var outline = L.polygon(window.currentPolygonCoordinates, {
+              color: '#ffffff',
+              weight: 3,
+              fillColor: 'transparent'
+          }).addTo(dashMap);
+          dashMap.fitBounds(outline.getBounds());
+
+          // Add the real NDVI Tile Layer overlay
+          L.tileLayer(ndviTileUrl, {
+              maxZoom: 20,
+              attribution: 'Agromonitoring Satellite NDVI'
+          }).addTo(dashMap);
+          
+          toast("Live Satellite NDVI Scan Complete. Data from " + new Date(latestImage.dt * 1000).toLocaleDateString());
+          
+          var detailEl = document.getElementById('field-detail');
+          if (detailEl) {
+              detailEl.style.display = 'block';
+              document.getElementById('field-detail-name').innerHTML = '🛰️ Live Satellite (Sentinel/Landsat)';
+              document.getElementById('field-detail-status').innerHTML = '🟢 NDVI RENDERED';
+              document.getElementById('field-detail-status').style.color = 'var(--green)';
+              document.getElementById('field-detail-status').style.background = 'rgba(61, 122, 58, 0.1)';
+          }
+      })
+      .catch(err => {
+          console.error("Satellite Error:", err);
+          toast("Satellite analysis failed. Please try a different area.", "error");
+          btn.innerHTML = '🛰️ Analyze Field';
+          btn.style.pointerEvents = 'auto';
+      });
     }
 
     // ── Water Pump ──────────────────────────────
