@@ -1612,7 +1612,7 @@
     let imageBase64 = null;
 
     // ── Field Map Data ───────────────────────────
-    var FIELDS = {
+    window.FIELDS = {
       A: { name: 'North Field A', crop: 'Wheat', icon: '🌾', area: '4.2 acres', planted: 'Jan 12', status: 'healthy', statusLabel: '🟢 HEALTHY' },
       B: { name: 'East Field B', crop: 'Rice', icon: '🌾', area: '3.1 acres', planted: 'Feb 5', status: 'irrigating', statusLabel: '🔵 IRRIGATING' },
       C: { name: 'South Field C', crop: 'Corn', icon: '🌽', area: '5.8 acres', planted: 'Jan 20', status: 'harvesting', statusLabel: '🟡 HARVESTING' },
@@ -1621,7 +1621,7 @@
     };
 
     function selectField(id) {
-      var f = FIELDS[id];
+      var f = window.FIELDS[id];
       if (!f) return;
       document.getElementById('field-detail').style.display = 'block';
       document.getElementById('field-detail-name').textContent = f.name;
@@ -1648,8 +1648,8 @@
     function renderRegionList() {
       var el = document.getElementById('region-list');
       if (!el) return;
-      el.innerHTML = Object.keys(FIELDS).map(function (id) {
-        var f = FIELDS[id];
+      el.innerHTML = Object.keys(window.FIELDS).map(function (id) {
+        var f = window.FIELDS[id];
         var dotColor = { healthy: '#3d7a3a', irrigating: '#5ba4cf', harvesting: '#d4952a', alert: '#c0392b' }[f.status] || '#3d7a3a';
         return '<div class="region-item" id="region-' + id + '" onclick="selectField(\'' + id + '\')" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:12px;transition:.15s;" onmouseover="this.style.background=\'rgba(61,122,58,0.05)\'" onmouseout="this.style.background=\'\'">'
           + '<div style="width:10px;height:10px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;"></div>'
