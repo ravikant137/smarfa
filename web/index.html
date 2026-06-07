@@ -5,7 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#3d7a3a">
-  <link rel="manifest" href="/web/manifest.json">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg">
   <title>Smarfa — Smart AI Farming</title>
   <style>
     * {
@@ -625,7 +627,7 @@
     // Register PWA Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/web/sw.js')
+        navigator.serviceWorker.register('/sw.js')
           .then(reg => console.log('Smarfa PWA Service Worker Registered', reg.scope))
           .catch(err => console.log('PWA SW Registration failed:', err));
       });
