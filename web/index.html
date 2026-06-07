@@ -711,6 +711,7 @@
         </div>
       </div>
       <div class="nav-links">
+        <button id="pwa-install-btn" style="display:none; color: #fff; background: var(--green); border-radius: 8px; padding: 6px 16px; margin-right: 8px; font-weight: bold; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(61, 122, 58, 0.3);">📥 Install App</button>
         <button onclick="switchTab('dashboard')" data-tab="dashboard" class="active" id="btn-dashboard">Home</button>
         <button onclick="switchTab('scan')" data-tab="scan" id="btn-scan">AI Scan</button>
         <button onclick="switchTab('subsidies')" data-tab="subsidies" id="btn-subsidies">🏦 Subsidies</button>
@@ -3750,6 +3751,44 @@
       <button onclick="sendChatMessage()">➤</button>
     </div>
   </div>
+
+  <script>
+    let deferredPrompt;
+    const installBtn = document.getElementById('pwa-install-btn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      deferredPrompt = e;
+      // Update UI notify the user they can install the PWA
+      if (installBtn) installBtn.style.display = 'block';
+    });
+
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        // Hide the app provided install promotion
+        installBtn.style.display = 'none';
+        // Show the install prompt
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          // Wait for the user to respond to the prompt
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`User response to the install prompt: ${outcome}`);
+          // We've used the prompt, and can't use it again, throw it away
+          deferredPrompt = null;
+        }
+      });
+    }
+
+    window.addEventListener('appinstalled', () => {
+      // Hide the app-provided install promotion
+      if (installBtn) installBtn.style.display = 'none';
+      // Clear the deferredPrompt so it can be garbage collected
+      deferredPrompt = null;
+      console.log('PWA was installed');
+    });
+  </script>
 </body>
 
 </html>
