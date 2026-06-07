@@ -230,6 +230,70 @@
     }
 
     window.toast(`🛰️ NDVI:${mean != null ? mean.toFixed(3) : 'N/A'} | 🌍 Soil:${soilMoisture || '--'}% | 💧 Rain:${totalRain != null ? totalRain.toFixed(1) : '--'}mm`);
+
+    // Sync the analyzed field into the region list
+    syncAnalyzedFieldToRegionList(mean, color, label, soilMoisture, totalRain, imgDate);
+  }
+
+  function syncAnalyzedFieldToRegionList(mean, color, label, soilMoisture, totalRain, imgDate) {
+    if (typeof window.FIELDS === 'undefined') return;
+
+    // Get real area computed earlier
+    const areaEl = document.getElementById('field-detail-area');
+    const area = (areaEl && areaEl.textContent && areaEl.textContent !== '—') ? areaEl.textContent : 'Calculating...';
+
+    // Determine status key from NDVI
+    const statusKey = mean == null ? 'unknown' : mean >= 0.4 ? 'healthy' : mean >= 0.2 ? 'stressed' : 'alert';
+    const statusLabel = mean == null ? '⚪ NO DATA' : mean >= 0.4 ? '🟢 HEALTHY' : mean >= 0.2 ? '🟡 STRESSED' : '🔴 ALERT';
+
+    // Upsert a "Satellite Field" entry in FIELDS keyed by 'SAT'
+    window.FIELDS['SAT'] = {
+      name: '🛰️ Satellite Field (' + imgDate + ')',
+      crop: 'Not Set', // User hasn't set crop yet
+      icon: '🌍',
+      area: area,
+      planted: soilMoisture ? 'Soil: ' + soilMoisture + '%' : '—',
+      status: statusKey,
+      statusLabel: statusLabel,
+      ndvi: mean != null ? mean.toFixed(3) : null,
+      rain7d: totalRain != null ? totalRain.toFixed(1) + 'mm' : null,
+      _isSatellite: true
+    };
+
+    // Re-render region list to include satellite field at top
+    const el = document.getElementById('region-list');
+    if (!el) return;
+
+    const allFields = window.FIELDS;
+    const dotColors = {
+      healthy: '#3d7a3a', stressed: '#f59e0b',
+      irrigating: '#5ba4cf', harvesting: '#d4952a',
+      alert: '#c0392b', unknown: '#94a3b8'
+    };
+
+    el.innerHTML = Object.keys(allFields).map(function(id) {
+      const f = allFields[id];
+      const dot = dotColors[f.status] || '#3d7a3a';
+      const extraLine = f._isSatellite
+        ? `${f.ndvi ? '📊 NDVI:' + f.ndvi + ' · ' : ''}${f.rain7d ? '💧 ' + f.rain7d : ''}`
+        : `${f.icon} ${f.crop} · ${f.area}`;
+      const bg = id === 'SAT' ? 'rgba(0,229,255,0.06)' : '';
+      const border = id === 'SAT' ? 'border-left:3px solid #00e5ff;' : '';
+      return `<div class="region-item" id="region-${id}" onclick="selectField('${id}')"
+        style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:12px;transition:.15s;background:${bg};${border}"
+        onmouseover="this.style.background='rgba(61,122,58,0.05)'" onmouseout="this.style.background='${bg}'">
+        <div style="width:10px;height:10px;border-radius:50%;background:${dot};flex-shrink:0;"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${extraLine}</div>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:${dot};">${id}</div>
+      </div>`;
+    }).join('');
+
+    // Highlight the satellite field
+    const satRow = document.getElementById('region-SAT');
+    if (satRow) satRow.style.background = 'rgba(0,229,255,0.08)';
   }
 
 })();
