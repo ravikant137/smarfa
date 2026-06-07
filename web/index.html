@@ -1397,7 +1397,7 @@
     }
 
     function fetchWeatherForecast(lat, lon) {
-      var url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto`;
+      var url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto&past_days=3`;
       
       fetch(url)
         .then(res => res.json())
@@ -1433,17 +1433,17 @@
 
           const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-          for(let i=0; i < Math.min(7, data.daily.time.length); i++) {
+          for(let i=3; i < Math.min(10, data.daily.time.length); i++) {
             var dateStr = data.daily.time[i];
             var dateObj = new Date(dateStr);
-            var dayName = i === 0 ? 'Today' : (i === 1 ? 'Tmrw' : daysOfWeek[dateObj.getDay()]);
+            var dayName = i === 3 ? 'Today' : (i === 4 ? 'Tmrw' : daysOfWeek[dateObj.getDay()]);
             
             var maxT = Math.round(data.daily.temperature_2m_max[i]);
             var minT = Math.round(data.daily.temperature_2m_min[i]);
             var rainProb = data.daily.precipitation_probability_max[i];
             var icon = getIcon(data.daily.weather_code[i]);
             
-            if (i > 0 && i <= 3 && rainProb > 50) {
+            if (i > 3 && i <= 6 && rainProb > 50) {
               rainAlert = true;
               rainDays.push(dayName);
             }
@@ -1461,31 +1461,44 @@
           }
 
           // --- AI Agronomy Impact Analysis ---
+          var pastRainVolume = 0;
+          for(let i=0; i < 3; i++) {
+            if (data.daily.precipitation_sum[i]) pastRainVolume += data.daily.precipitation_sum[i];
+          }
+
           var max3DaysTemp = -99;
           var min3DaysTemp = 99;
           var max3DaysRain = 0;
-          var totalRainVolume = 0;
+          var futureRainVolume = 0;
           
-          for(let i=0; i < Math.min(3, data.daily.time.length); i++) {
+          for(let i=3; i < Math.min(6, data.daily.time.length); i++) {
             if (data.daily.temperature_2m_max[i] > max3DaysTemp) max3DaysTemp = data.daily.temperature_2m_max[i];
             if (data.daily.temperature_2m_min[i] < min3DaysTemp) min3DaysTemp = data.daily.temperature_2m_min[i];
             if (data.daily.precipitation_probability_max[i] > max3DaysRain) max3DaysRain = data.daily.precipitation_probability_max[i];
-            if (data.daily.precipitation_sum[i]) totalRainVolume += data.daily.precipitation_sum[i];
+            if (data.daily.precipitation_sum[i]) futureRainVolume += data.daily.precipitation_sum[i];
           }
 
           var impacts = [];
+
+          // Historical Saturation Logic
+          if (pastRainVolume > 30 && futureRainVolume > 10) {
+            impacts.push(`<div style="background:rgba(192, 57, 43, 0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🚨 Critical Waterlogging Risk:</strong> Fields already received ${pastRainVolume.toFixed(1)}mm of rain over the past 3 days. Soil is fully saturated. The additional ${futureRainVolume.toFixed(1)}mm expected will cause severe runoff and root suffocation. Do NOT irrigate!</div>`);
+          } else if (pastRainVolume > 20) {
+            impacts.push(`<div style="background:rgba(61, 122, 58, 0.05); border-left:3px solid var(--green); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>💧 Historical Saturation:</strong> Received ${pastRainVolume.toFixed(1)}mm rain recently. Soil moisture is optimal. Skip current irrigation cycles.</div>`);
+          } else if (pastRainVolume < 5 && futureRainVolume < 5) {
+             impacts.push(`<div style="background:rgba(212, 149, 42, 0.05); border-left:3px solid var(--yellow); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌵 Dry Soil Profile:</strong> Only ${pastRainVolume.toFixed(1)}mm rain in the past 3 days and minimal rain expected. Deep irrigation is highly recommended to maintain crop health.</div>`);
+          }
+
           if (max3DaysRain > 50) {
             impacts.push(`<div style="background:rgba(192, 57, 43, 0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌧️ High Rain Risk (${Math.round(max3DaysRain)}% chance):</strong> Delay pesticide and foliar fertilizer sprays. High risk of fungal diseases (e.g., Blight, Mildew) in broadleaf crops. Ensure field drainage pathways are clear.</div>`);
           } else if (max3DaysRain > 20) {
             impacts.push(`<div style="background:rgba(212, 149, 42, 0.05); border-left:3px solid var(--yellow); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌦️ Light Rain Possible:</strong> Monitor soil moisture before running irrigation. Minor pest activity might increase due to humidity.</div>`);
           }
 
-          if (totalRainVolume > 40) {
-            impacts.push(`<div style="background:rgba(192, 57, 43, 0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌊 Heavy Downpour Alert (~${totalRainVolume.toFixed(1)}mm):</strong> High risk of waterlogging and root rot. Clear drainage channels immediately and delay all mechanical field operations until soil dries.</div>`);
-          } else if (totalRainVolume >= 10 && totalRainVolume <= 40) {
-            impacts.push(`<div style="background:rgba(61, 122, 58, 0.05); border-left:3px solid var(--green); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>💧 Excellent Moisture Recharge (~${totalRainVolume.toFixed(1)}mm):</strong> Soil profile will be well hydrated. You can safely skip the next 1-2 irrigation cycles to save water and electricity.</div>`);
-          } else if (totalRainVolume > 0 && totalRainVolume < 10) {
-             impacts.push(`<div style="background:rgba(44, 154, 219, 0.05); border-left:3px solid #2c9adb; padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>💦 Light Surface Wetting (~${totalRainVolume.toFixed(1)}mm):</strong> Sufficient for dust settling but insufficient for deep root hydration. Maintain standard drip/sprinkler schedules.</div>`);
+          if (futureRainVolume > 40) {
+            impacts.push(`<div style="background:rgba(192, 57, 43, 0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌊 Heavy Downpour Alert (~${futureRainVolume.toFixed(1)}mm expected):</strong> High risk of waterlogging and root rot. Clear drainage channels immediately and delay all mechanical field operations until soil dries.</div>`);
+          } else if (futureRainVolume >= 10 && futureRainVolume <= 40 && pastRainVolume <= 20) {
+            impacts.push(`<div style="background:rgba(61, 122, 58, 0.05); border-left:3px solid var(--green); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>💧 Expected Moisture Recharge (~${futureRainVolume.toFixed(1)}mm):</strong> Soil profile will be well hydrated soon. You can safely skip the next 1-2 irrigation cycles to save water and electricity.</div>`);
           }
 
           if (max3DaysTemp > 35) {
