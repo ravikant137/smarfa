@@ -2211,41 +2211,95 @@
           // Get the most recent image
           images.sort((a,b) => b.dt - a.dt);
           var latestImage = images[0];
+          var imageDate = new Date(latestImage.dt * 1000).toLocaleDateString();
 
-          btn.innerHTML = '✅ NDVI Complete';
-          btn.style.background = 'var(--sky)';
-
-          // 4. Overlay the TrueColor and NDVI tiles onto the Leaflet map!
-          // Note: API tile URLs already include {z}/{x}/{y} format compatible with Leaflet
-          var ndviTileUrl = latestImage.tile.ndvi + "?appid=" + AGRO_API_KEY;
-          
-          // Remove the editable drawn shapes
+          // Remove drawn shapes, draw clean outline
           window.drawnItems.clearLayers();
-          
-          // Draw a solid white outline of the polygon
           var outline = L.polygon(window.currentPolygonCoordinates, {
-              color: '#ffffff',
-              weight: 3,
-              fillColor: 'transparent'
+              color: '#00e5ff', weight: 3, fillColor: 'transparent'
           }).addTo(dashMap);
           dashMap.fitBounds(outline.getBounds());
 
-          // Add the real NDVI Tile Layer overlay
-          L.tileLayer(ndviTileUrl, {
-              maxZoom: 20,
-              attribution: 'Agromonitoring Satellite NDVI'
-          }).addTo(dashMap);
-          
-          toast("Live Satellite NDVI Scan Complete. Data from " + new Date(latestImage.dt * 1000).toLocaleDateString());
-          
-          var detailEl = document.getElementById('field-detail');
-          if (detailEl) {
-              detailEl.style.display = 'block';
-              document.getElementById('field-detail-name').innerHTML = '🛰️ Live Satellite (Sentinel/Landsat)';
-              document.getElementById('field-detail-status').innerHTML = '🟢 NDVI RENDERED';
-              document.getElementById('field-detail-status').style.color = 'var(--green)';
-              document.getElementById('field-detail-status').style.background = 'rgba(61, 122, 58, 0.1)';
-          }
+          // 4. Fetch real NDVI stats from Agromonitoring stats endpoint
+          return fetch(`https://api.agromonitoring.com/agro/1.0/ndvi/history?polyid=${polyId}&appid=${AGRO_API_KEY}`)
+            .then(r => r.json())
+            .then(ndviHistory => {
+              // Get the latest stats
+              var ndviStats = null;
+              if (ndviHistory && ndviHistory.length > 0) {
+                ndviHistory.sort((a,b) => b.dt - a.dt);
+                ndviStats = ndviHistory[0].data;
+              }
+              
+              var mean = ndviStats ? ndviStats.mean : null;
+              var min = ndviStats ? ndviStats.min : null;
+              var max = ndviStats ? ndviStats.max : null;
+
+              // Color based on NDVI mean: <0.2=bare, 0.2-0.4=stressed, 0.4-0.6=moderate, >0.6=healthy
+              function ndviToColor(val) {
+                if (val === null) return '#aaa';
+                if (val < 0.1) return '#ef4444';   // bare soil / very stressed
+                if (val < 0.2) return '#f97316';   // severe stress
+                if (val < 0.35) return '#f59e0b';  // moderate stress
+                if (val < 0.5) return '#84cc16';   // moderate health
+                return '#16a34a';                  // healthy / high vigor
+              }
+
+              var fieldColor = ndviToColor(mean);
+              var healthLabel = mean === null ? 'No Data' :
+                                mean < 0.1 ? 'Bare Soil / Severe Stress' :
+                                mean < 0.2 ? 'Severe Vegetation Stress' :
+                                mean < 0.35 ? 'Moderate Stress' :
+                                mean < 0.5 ? 'Moderate Health' : 'Healthy Crop';
+
+              // Apply color fill on the polygon
+              outline.setStyle({ fillColor: fieldColor, fillOpacity: 0.55, color: '#fff', weight: 2 });
+
+              // Overlay gradient zones if we have min/max spread
+              if (ndviStats && max - min > 0.1) {
+                // Stressed zone (min side) - top-left quarter
+                var b = outline.getBounds();
+                var stressBounds = [
+                  [b.getNorth(), b.getWest()],
+                  [b.getNorth(), (b.getWest()+b.getEast())/2],
+                  [(b.getNorth()+b.getSouth())/2, (b.getWest()+b.getEast())/2],
+                  [(b.getNorth()+b.getSouth())/2, b.getWest()]
+                ];
+                L.polygon(stressBounds, {
+                  color: 'transparent', weight: 0,
+                  fillColor: ndviToColor(min), fillOpacity: 0.45
+                }).addTo(dashMap);
+              }
+
+              // NDVI legend
+              var legend = L.control({ position: 'bottomleft' });
+              legend.onAdd = function() {
+                var div = L.DomUtil.create('div');
+                div.style.cssText = 'background:#fff;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.15);';
+                div.innerHTML = `<div style="margin-bottom:6px;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px;">🤖 NDVI Analysis</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="width:14px;height:14px;background:#16a34a;border-radius:3px;display:inline-block;"></span> Healthy (NDVI >0.5)</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="width:14px;height:14px;background:#84cc16;border-radius:3px;display:inline-block;"></span> Moderate (0.35–0.5)</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="width:14px;height:14px;background:#f59e0b;border-radius:3px;display:inline-block;"></span> Stressed (0.2–0.35)</div>
+                  <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:14px;background:#ef4444;border-radius:3px;display:inline-block;"></span> Severe / Bare (<0.2)</div>
+                  ${mean !== null ? `<hr style="border:none;border-top:1px solid #eee;margin:8px 0;"><div style="color:#333;">📊 Field NDVI: <b style="color:${fieldColor}">${mean.toFixed(3)}</b></div><div style="color:#666;font-size:11px;margin-top:2px;">${healthLabel}</div>` : ''}`;
+                return div;
+              };
+              legend.addTo(dashMap);
+
+              btn.innerHTML = '✅ NDVI Complete';
+              btn.style.background = 'var(--sky)';
+              toast(`Live NDVI: Mean=${mean !== null ? mean.toFixed(3) : 'N/A'} | ${healthLabel} | ${imageDate}`);
+
+              var detailEl = document.getElementById('field-detail');
+              if (detailEl) {
+                detailEl.style.display = 'block';
+                document.getElementById('field-detail-name').innerHTML = '🛰️ ' + imageDate + ' · ' + healthLabel;
+                var statusEl = document.getElementById('field-detail-status');
+                statusEl.innerHTML = mean !== null ? (mean >= 0.4 ? '🟢 HEALTHY' : mean >= 0.2 ? '🟡 STRESSED' : '🔴 SEVERE STRESS') : '⚪ NO DATA';
+                statusEl.style.color = fieldColor;
+                statusEl.style.background = fieldColor + '22';
+              }
+            });
       })
       .catch(err => {
           console.error("Satellite Error:", err);
