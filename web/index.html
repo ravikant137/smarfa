@@ -1408,7 +1408,42 @@
       API = 'http://192.168.29.181:8000';
     }
 
+    var AGRO_API_KEY = "8518d290ab4e6f4ca86ee6c7d841b3fb";
+
+    function fetchAgroWeather(lat, lon) {
+      // Agromonitoring current weather API - field-specific, more agricultural
+      fetch(`https://api.agromonitoring.com/agro/1.0/weather?lat=${lat}&lon=${lon}&appid=${AGRO_API_KEY}&units=metric`)
+        .then(r => r.json())
+        .then(w => {
+          if (!w || !w.main) return;
+          
+          var temp = Math.round(w.main.temp);
+          var humidity = w.main.humidity;
+          var feelsLike = Math.round(w.main.feels_like);
+          var windSpeed = w.wind ? (w.wind.speed * 3.6).toFixed(1) : null; // m/s to km/h
+          var cloudCover = w.clouds ? w.clouds.all : null;
+          var weather = w.weather && w.weather[0] ? w.weather[0].description : '';
+          var pressure = w.main.pressure;
+
+          // Update the stat cards with Agromonitoring precision data
+          document.getElementById('s-temp').textContent = temp + '°C';
+          document.getElementById('s-temp-sub').textContent = 'Feels ' + feelsLike + '°C · ' + weather;
+          document.getElementById('s-moisture').textContent = humidity + '%';
+          document.getElementById('s-moisture-sub').textContent = (windSpeed ? '💨 ' + windSpeed + ' km/h' : 'Humidity') + (cloudCover !== null ? ' · ☁️ ' + cloudCover + '%' : '');
+
+          // Show a live badge on the weather card
+          var tempEl = document.getElementById('s-temp');
+          if (tempEl) tempEl.setAttribute('title', `Field Weather · Pressure: ${pressure}hPa · Clouds: ${cloudCover}% · Wind: ${windSpeed}km/h`);
+          
+          console.log('Agromonitoring field weather loaded:', w);
+        })
+        .catch(err => console.log('Agromonitoring weather fallback to Open-Meteo', err));
+    }
+
     function fetchWeatherForecast(lat, lon) {
+      // First: try Agromonitoring field-specific weather
+      fetchAgroWeather(lat, lon);
+
       var url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto&past_days=3`;
       
       fetch(url)
@@ -2161,7 +2196,6 @@
       btn.innerHTML = '🔄 Processing...';
       btn.style.pointerEvents = 'none';
       
-      var AGRO_API_KEY = "8518d290ab4e6f4ca86ee6c7d841b3fb";
       
       // 1. Convert our polygon to GeoJSON format (Lon, Lat)
       var geoJsonCoords = window.currentPolygonCoordinates.map(ll => [ll[1], ll[0]]);
