@@ -1397,7 +1397,7 @@
     }
 
     function fetchWeatherForecast(lat, lon) {
-      var url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`;
+      var url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto`;
       
       fetch(url)
         .then(res => res.json())
@@ -1464,18 +1464,28 @@
           var max3DaysTemp = -99;
           var min3DaysTemp = 99;
           var max3DaysRain = 0;
+          var totalRainVolume = 0;
           
           for(let i=0; i < Math.min(3, data.daily.time.length); i++) {
             if (data.daily.temperature_2m_max[i] > max3DaysTemp) max3DaysTemp = data.daily.temperature_2m_max[i];
             if (data.daily.temperature_2m_min[i] < min3DaysTemp) min3DaysTemp = data.daily.temperature_2m_min[i];
             if (data.daily.precipitation_probability_max[i] > max3DaysRain) max3DaysRain = data.daily.precipitation_probability_max[i];
+            if (data.daily.precipitation_sum[i]) totalRainVolume += data.daily.precipitation_sum[i];
           }
 
           var impacts = [];
           if (max3DaysRain > 50) {
-            impacts.push(`<div style="background:rgba(192, 57, 43, 0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌧️ High Rain Risk (${Math.round(max3DaysRain)}%):</strong> Delay pesticide and foliar fertilizer sprays. High risk of fungal diseases (e.g., Blight, Mildew) in broadleaf crops. Ensure field drainage pathways are clear.</div>`);
+            impacts.push(`<div style="background:rgba(192, 57, 43, 0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌧️ High Rain Risk (${Math.round(max3DaysRain)}% chance):</strong> Delay pesticide and foliar fertilizer sprays. High risk of fungal diseases (e.g., Blight, Mildew) in broadleaf crops. Ensure field drainage pathways are clear.</div>`);
           } else if (max3DaysRain > 20) {
             impacts.push(`<div style="background:rgba(212, 149, 42, 0.05); border-left:3px solid var(--yellow); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌦️ Light Rain Possible:</strong> Monitor soil moisture before running irrigation. Minor pest activity might increase due to humidity.</div>`);
+          }
+
+          if (totalRainVolume > 40) {
+            impacts.push(`<div style="background:rgba(192, 57, 43, 0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>🌊 Heavy Downpour Alert (~${totalRainVolume.toFixed(1)}mm):</strong> High risk of waterlogging and root rot. Clear drainage channels immediately and delay all mechanical field operations until soil dries.</div>`);
+          } else if (totalRainVolume >= 10 && totalRainVolume <= 40) {
+            impacts.push(`<div style="background:rgba(61, 122, 58, 0.05); border-left:3px solid var(--green); padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>💧 Excellent Moisture Recharge (~${totalRainVolume.toFixed(1)}mm):</strong> Soil profile will be well hydrated. You can safely skip the next 1-2 irrigation cycles to save water and electricity.</div>`);
+          } else if (totalRainVolume > 0 && totalRainVolume < 10) {
+             impacts.push(`<div style="background:rgba(44, 154, 219, 0.05); border-left:3px solid #2c9adb; padding:10px 14px; border-radius:4px; font-size:14px; color:var(--text); line-height:1.4;"><strong>💦 Light Surface Wetting (~${totalRainVolume.toFixed(1)}mm):</strong> Sufficient for dust settling but insufficient for deep root hydration. Maintain standard drip/sprinkler schedules.</div>`);
           }
 
           if (max3DaysTemp > 35) {
