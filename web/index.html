@@ -550,6 +550,67 @@
     .goog-te-menu-value span:nth-child(3) {
       border-left: none !important;
     }
+
+    /* ── Mobile Responsiveness ────────────────────── */
+    @media (max-width: 768px) {
+      .nav {
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .nav-logo {
+        font-size: 20px;
+      }
+      .nav-links {
+        width: 100%;
+        gap: 16px;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+        justify-content: flex-start;
+      }
+      .nav-links::-webkit-scrollbar {
+        display: none;
+      }
+      .nav-links {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .content {
+        padding: 20px 16px;
+      }
+      .stat-grid, .dashboard-grid, .tools-grid, .alerts-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      
+      /* Override inline grid column styles for mobile stacking */
+      #dash-stats,
+      [style*="grid-template-columns:1fr 340px"],
+      [style*="grid-template-columns:repeat(4,1fr)"],
+      [style*="grid-template-columns:repeat(3,1fr)"],
+      [style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+      }
+      
+      .welcome-banner {
+        padding: 30px 20px;
+      }
+      .welcome-banner h2 {
+        font-size: 28px;
+      }
+      .welcome-banner p {
+        font-size: 15px;
+      }
+      .auth-form {
+        padding: 20px;
+      }
+      .auth-container {
+        padding: 30px 20px;
+        margin: 20px;
+      }
+    }
   </style>
   <script type="text/javascript">
     function googleTranslateElementInit() {
