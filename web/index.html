@@ -2398,8 +2398,8 @@
           var realFallbacks = [
             { name: "Varsha Enterprises Garden Shop", distance: "2.1 km", stock: 25, price: 250, color: "var(--green)" },
             { name: "Sri Lakshmi Venkateshwara Agri Center", distance: "4.5 km", stock: 0, price: 290, color: "var(--red)" },
-            { name: "Pooja Electricals & Hardware", distance: "6.2 km", stock: 34, price: 220, color: "var(--green)" },
-            { name: "Karnakata Hardware Store", distance: "7.8 km", stock: 12, price: 210, color: "var(--green)" }
+            { name: "Kisan Krushi Kendra", distance: "6.2 km", stock: 34, price: 220, color: "var(--green)" },
+            { name: "Nursery & Farm Essentials", distance: "7.8 km", stock: 12, price: 210, color: "var(--green)" }
           ];
           renderStores(realFallbacks);
         }
@@ -2431,7 +2431,7 @@
         function fetchOverpassStores() {
           var lat = window.userLat;
           var lon = window.userLon;
-          var query = '[out:json][timeout:15];nwr(around:50000,' + lat + ',' + lon + ')["shop"~"agrarian|garden_centre|hardware"];out body 15;';
+          var query = '[out:json][timeout:15];nwr(around:50000,' + lat + ',' + lon + ')["shop"~"agrarian|garden_centre"];out body 15;';
 
           fetch('https://overpass-api.de/api/interpreter', {
             method: 'POST',
