@@ -2068,6 +2068,45 @@
       }
     }
 
+    async function computeImageHash(base64) {
+      return new Promise((resolve) => {
+        if (!base64) return resolve(null);
+        var img = new Image();
+        img.onload = function() {
+          var canvas = document.createElement('canvas');
+          canvas.width = 8;
+          canvas.height = 8;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, 8, 8);
+          var imgData = ctx.getImageData(0, 0, 8, 8).data;
+          var grays = [];
+          var total = 0;
+          for (var i = 0; i < imgData.length; i += 4) {
+            var gray = imgData[i]*0.299 + imgData[i+1]*0.587 + imgData[i+2]*0.114;
+            grays.push(gray);
+            total += gray;
+          }
+          var avg = total / 64;
+          var hash = '';
+          for (var i = 0; i < 64; i++) {
+            hash += (grays[i] >= avg ? '1' : '0');
+          }
+          resolve(hash);
+        };
+        img.onerror = () => resolve(null);
+        img.src = base64;
+      });
+    }
+
+    function getHammingDistance(h1, h2) {
+      if (!h1 || !h2 || h1.length !== h2.length) return 999;
+      var dist = 0;
+      for (var i = 0; i < h1.length; i++) {
+        if (h1[i] !== h2[i]) dist++;
+      }
+      return dist;
+    }
+
     async function analyzeCrop() {
       var userQuery = document.getElementById('voice-input').value.trim();
       if (!imageBase64 && !userQuery) return;
@@ -2076,6 +2115,27 @@
       var results = document.getElementById('scan-results');
       btn.disabled = true; loading.style.display = 'flex'; results.style.display = 'none';
       try {
+        // ── SMART CACHING (Perceptual Hashing) ──
+        var currentHash = await computeImageHash(imageBase64);
+        var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+        if (currentHash && !userQuery) {
+          for (var i = history.length - 1; i >= 0; i--) {
+            if (history[i].ahash) {
+              var dist = getHammingDistance(currentHash, history[i].ahash);
+              if (dist <= 5) { // 92%+ visual match
+                setTimeout(() => {
+                  renderResults(history[i], true);
+                  results.style.display = 'block';
+                  loading.style.display = 'none';
+                  btn.disabled = false;
+                  window.toast('⚡ Loaded from Cache! Saved API Cost.', 'success');
+                }, 800); // add a tiny simulated loading time
+                return;
+              }
+            }
+          }
+        }
+
         var hintVal = 'auto';
         var payload = {
           image_base64: imageBase64,
@@ -2092,8 +2152,10 @@
         if (d.success && d.data) {
             d = d.data;
         }
+        
+        if (currentHash) d.ahash = currentHash; // Attach perceptual hash
 
-        renderResults(d);
+        renderResults(d, false);
         results.style.display = 'block';
         // Trigger Push Notification/Alert
         var sev = d.severity || 'warning';
@@ -2111,7 +2173,7 @@
       loading.style.display = 'none'; btn.disabled = false;
     }
 
-    function renderResults(d) {
+    function renderResults(d, skipSave) {
       var el = document.getElementById('scan-results');
       var sev = d.severity || 'warning';
       var confColor = (d.ai_confidence || 0) >= 60 ? 'var(--green)' : (d.ai_confidence || 0) >= 30 ? 'var(--yellow)' : 'var(--red)';
@@ -2189,10 +2251,12 @@
       if (fallback) fallback.style.display = 'block';
 
       // Save to local scan history
-      var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
-      d.timestamp = new Date().toISOString();
-      history.push(d);
-      localStorage.setItem('scanHistory', JSON.stringify(history));
+      if (!skipSave) {
+        var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+        d.timestamp = new Date().toISOString();
+        history.push(d);
+        localStorage.setItem('scanHistory', JSON.stringify(history));
+      }
     }
 
     function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
