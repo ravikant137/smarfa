@@ -1499,6 +1499,18 @@
         window.userLat = position.coords.latitude;
         window.userLon = position.coords.longitude;
         if (window.APP) { window.APP.userLat = window.userLat; window.APP.userLon = window.userLon; }
+        
+        // Dynamically fetch actual city/district name
+        fetch('https://nominatim.openstreetmap.org/reverse?lat=' + window.userLat + '&lon=' + window.userLon + '&format=json')
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (data && data.address) {
+              var city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || 'your area';
+              var locEl = document.getElementById('market-location');
+              if (locEl) locEl.textContent = city;
+            }
+          }).catch(function(e){});
+
         // Use modular weather fetch (weather.js)
         if (window.fetchWeatherData) window.fetchWeatherData(window.userLat, window.userLon);
         else fetchWeatherForecast(window.userLat, window.userLon);
