@@ -42,7 +42,12 @@
         }).catch(() => {});
 
         const btn = document.getElementById('analyze-field-btn');
-        if (btn) btn.style.display = 'block';
+        if (btn) {
+          btn.style.display = 'block';
+          btn.innerHTML = '🛰️ Analyze Field';
+          btn.style.background = 'var(--green)';
+          btn.style.pointerEvents = 'auto';
+        }
         window.toast('Farm boundary drawn! Click "🛰️ Analyze Field" for satellite scan.');
       }
     });
