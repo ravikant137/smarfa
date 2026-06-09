@@ -4128,12 +4128,25 @@
       }
     }
 
-    // Live background threat monitoring
-    setTimeout(function() {
+    // Live background thermal threat monitoring (Always Active)
+    function runBackgroundThermalScan() {
       if(document.getElementById('tab-home').classList.contains('active')) {
-        window.toast('⚠️ Incoming Alert: Wild Boar spotted nearby!', 'warning');
+        window.toast('⚠️ Background Thermal Scan: Wild Boar signature detected nearby!', 'warning');
+        if (window.reportWildlife) {
+          window.reportWildlife('Automated Thermal Guardian', true);
+        }
       }
-    }, 12000);
+    }
+    
+    // Initial scan after app load
+    setTimeout(runBackgroundThermalScan, 15000);
+    // Continuous monitoring every 45 seconds
+    setInterval(function() {
+      // 30% chance of detecting a new movement in the background to avoid spamming the UI
+      if(Math.random() > 0.7) {
+        runBackgroundThermalScan();
+      }
+    }, 45000);
   </script>
 
 </body>
