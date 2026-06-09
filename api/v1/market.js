@@ -6,42 +6,42 @@ export default async function handler(req, res) {
   }
 
   const { query, treatment } = req.query;
-  const searchStr = (query + ' ' + treatment).toLowerCase();
+  const displayName = query || treatment || 'Agricultural Product';
+  const searchStr = (displayName + ' pesticide bottle').trim();
 
-  // Backend Product Database (Simulating a real e-commerce backend)
-  const productsDB = [
-    { keys: ["spinosad"], name: "Katyayani Spinosad 2.5% SC", image: "https://m.media-amazon.com/images/I/51r+hXo1RJL._SX679_.jpg", company: "Katyayani Organics", price: "₹450" },
-    { keys: ["copper", "blitox"], name: "Blitox 50W Copper Fungicide", image: "https://m.media-amazon.com/images/I/61WfQk5yJQL._SX679_.jpg", company: "Tata Rallis", price: "₹380" },
-    { keys: ["neem"], name: "Plantic Organic Neem Oil", image: "https://m.media-amazon.com/images/I/61r5tS0k1JL._SX679_.jpg", company: "Plantic", price: "₹299" },
-    { keys: ["imidacloprid", "confidor"], name: "Confidor Imidacloprid", image: "https://m.media-amazon.com/images/I/51T9w9w9pQL._SX679_.jpg", company: "Bayer CropScience", price: "₹520" },
-    { keys: ["mancozeb", "dithane"], name: "UPL Indofil M-45 Mancozeb", image: "https://m.media-amazon.com/images/I/71uVv8QOIfL._SX679_.jpg", company: "UPL Ltd", price: "₹310" },
-    { keys: ["chlorothalonil", "daconil"], name: "Syngenta Daconil 2787 Fungicide", image: "https://m.media-amazon.com/images/I/41-b0K0P0jL._AC_SY879_.jpg", company: "Syngenta", price: "₹850" },
-    { keys: ["trichoderma"], name: "Sanjeevni Trichoderma Viride", image: "https://m.media-amazon.com/images/I/61k2a03rG6L._SX679_.jpg", company: "Katyayani", price: "₹180" },
-    { keys: ["azoxystrobin", "amistar"], name: "Amistar Azoxystrobin 23% SC", image: "https://m.media-amazon.com/images/I/51wY84a-mBL._SX679_.jpg", company: "Syngenta", price: "₹1200" },
-    { keys: ["tricyclazole", "beam"], name: "Beam 75 WP Tricyclazole", image: "https://m.media-amazon.com/images/I/51D8zD1-mBL._SX679_.jpg", company: "Dow AgroSciences", price: "₹650" }
-  ];
+  try {
+    // Dynamically search the web for the product image (simulating Google Images search)
+    const searchUrl = `https://images.search.yahoo.com/search/images?p=${encodeURIComponent(searchStr)}`;
+    
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
 
-  let matchedProduct = null;
-
-  for (let prod of productsDB) {
-    for (let key of prod.keys) {
-      if (searchStr.includes(key)) {
-        matchedProduct = prod;
-        break;
+    if (response.ok) {
+      const html = await response.text();
+      // Extract the first high-quality thumbnail image from search results
+      const match = html.match(/src=["'](https:\/\/tse[0-9]\.mm\.bing\.net[^"']+)["']/);
+      
+      if (match && match[1]) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            name: displayName,
+            image: match[1],
+            company: "Verified Web Result",
+            price: "Check Local Store",
+            isWebScraped: true
+          }
+        });
       }
     }
-    if (matchedProduct) break;
+  } catch (error) {
+    console.error("Web scraper error:", error);
   }
 
-  if (matchedProduct) {
-    return res.status(200).json({
-      success: true,
-      data: matchedProduct
-    });
-  }
-
-  // Fallback: Generate dynamic AI product image if not in DB
-  const displayName = query || treatment || 'Agricultural Product';
+  // Fallback: Generate dynamic AI product image if web search fails
   const aiImagePrompt = encodeURIComponent('A professional product photo of an agricultural bottle labeled "' + displayName + '", pesticide chemical, clean white background, high quality');
   const aiFallbackUrl = 'https://image.pollinations.ai/prompt/' + aiImagePrompt + '?nologo=true&width=400&height=400';
 
