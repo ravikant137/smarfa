@@ -2362,8 +2362,9 @@
         var brandSubtitle = (aiProduct && aiProduct.commercial_name) ? aiProduct.commercial_name : activeIngredient;
         if (brandSubtitle.toLowerCase() === finalDisplayName.toLowerCase()) brandSubtitle = '';
 
-        // Dynamic image: Use a reliable fallback for pesticides/treatments
-        var productImgUrl = 'https://images.unsplash.com/photo-1628183212861-c8fc4ab58153?w=200&h=200&fit=crop&q=80';
+        // Dynamic AI Image Generation: Send a prompt to render a bottle of the exact chemical!
+        var aiImagePrompt = encodeURIComponent('A professional product photo of an agricultural bottle labeled "' + finalDisplayName + '", pesticide chemical, clean white background, high quality');
+        var productImgUrl = 'https://image.pollinations.ai/prompt/' + aiImagePrompt + '?nologo=true&width=400&height=400';
         var genericFallback = 'https://images.unsplash.com/photo-1585566369773-da34a6e6e67a?w=200&h=200&fit=crop&q=80';
 
         document.getElementById('market-disease-name').textContent = (lastScan.structured && lastScan.structured.disease_name) ? lastScan.structured.disease_name : "Crop Anomaly";
