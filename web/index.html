@@ -3197,15 +3197,63 @@
         { name: 'Fruit Development', icon: '🍎', days: 'Month 10–11', color: '#6ab04c', water: 'Every 7–10 days consistent', fertilizer: 'High-K fertilizer for colour and flavour', pest: 'Anar Butterfly, Birds, Bats', disease: 'Cercospora Fruit Spot, Crown Rot', tip: 'Bag fruits at marble size to protect from butterfly larvae. Net rows for bird protection.' },
         { name: 'Harvest & Post-harvest', icon: '🌾', days: 'Month 12', color: '#c0392b', water: 'Reduce 2 weeks before harvest', fertilizer: 'None', pest: 'Post-harvest pests', disease: 'Blue Mold in storage', tip: 'Harvest when skin turns red/pink and makes metallic sound on tapping. Store at 5–8°C for 2–3 months.' }
       ]
+    CROP_DATA['Tulsi'] = {
+      icon: '🌿', days: 90, soil: 'Well-drained Loam (pH 6–7.5)', water: 'Moderate — do not waterlog', sunlight: 'Full to Partial Sun (4–6 hrs)', yield: 'Continuous leaves', category: 'medicinal',
+      stages: [
+        { name: 'Seed Sowing', icon: '🪛', days: 'Day 1–15', color: '#8B5E3C', water: 'Light misting daily', fertilizer: 'Compost mixed soil', pest: 'Fungus Gnats', disease: 'Damping Off', tip: 'Seeds require light to germinate. Press them gently into the soil surface.' },
+        { name: 'Seedling', icon: '🌱', days: 'Day 16–30', color: '#6ab04c', water: 'Water when top 1 inch is dry', fertilizer: 'Diluted liquid organic fertilizer', pest: 'Aphids', disease: 'Root Rot', tip: 'Pinch off the top leaves once it reaches 6 inches to encourage bushy growth.' },
+        { name: 'Vegetative Growth', icon: '🌿', days: 'Day 31–60', color: '#3d7a3a', water: 'Every 2-3 days', fertilizer: 'Cow dung manure monthly', pest: 'Whiteflies, Spider Mites', disease: 'Powdery Mildew', tip: 'Prune regularly. Do not let the plant flower if you want continuous leaf production.' },
+        { name: 'Flowering & Seed Set', icon: '🌸', days: 'Day 61–90', color: '#d4952a', water: 'Reduce watering slightly', fertilizer: 'Stop fertilizing', pest: 'Mealybugs', disease: 'Leaf Spot', tip: 'If flowers (manjaris) form, cut them off to prolong the life of the plant, or let them seed.' }
+      ]
+    };
+
+    CROP_DATA['Aloe Vera'] = {
+      icon: '🌵', days: 365, soil: 'Sandy or Cactus potting mix (pH 7.0–8.5)', water: 'Very Low — let dry completely', sunlight: 'Bright Indirect to Full Sun', yield: 'Gel leaves year-round', category: 'medicinal',
+      stages: [
+        { name: 'Pup Planting', icon: '🪛', days: 'Month 1', color: '#8B5E3C', water: 'Wait 1 week before first watering', fertilizer: 'None at planting', pest: 'Mealybugs', disease: 'Root Rot', tip: 'Plant offsets (pups) directly. Let the cut callous over for 2 days before potting.' },
+        { name: 'Root Establishment', icon: '🌱', days: 'Month 2–3', color: '#6ab04c', water: 'Every 3-4 weeks', fertilizer: 'Dilute cactus fertilizer', pest: 'Scale Insects', disease: 'Soft Rot', tip: 'Keep in bright indirect light during this phase to avoid sunburn on new pups.' },
+        { name: 'Fleshy Growth', icon: '🌵', days: 'Month 4–12', color: '#3d7a3a', water: 'Soak & Dry method', fertilizer: 'Phosphorus heavy feed twice a year', pest: 'Aphids', disease: 'Aloe Rust', tip: 'Leaves will plump up when healthy. Brown or mushy leaves mean overwatering.' },
+        { name: 'Harvest', icon: '✂️', days: 'Year-Round', color: '#c0392b', water: 'Standard maintenance', fertilizer: 'None near harvest', pest: 'None', disease: 'None', tip: 'Cut the thickest outer leaves near the base using a sharp, clean knife.' }
+      ]
+    };
+
+    CROP_DATA['Mint'] = {
+      icon: '🍃', days: 60, soil: 'Rich, moist soil (pH 6.0–7.0)', water: 'High — keep consistently moist', sunlight: 'Partial Shade', yield: 'Continuous harvest', category: 'herb',
+      stages: [
+        { name: 'Propagation', icon: '🪛', days: 'Day 1–10', color: '#8B5E3C', water: 'Daily misting', fertilizer: 'Compost', pest: 'Spider mites', disease: 'Rust', tip: 'Mint grows best from cuttings in water or soil. Never plant directly in ground unless contained.' },
+        { name: 'Runner Spreading', icon: '🌱', days: 'Day 11–30', color: '#6ab04c', water: 'Keep soil very moist', fertilizer: 'Nitrogen rich liquid feed', pest: 'Aphids', disease: 'Powdery Mildew', tip: 'Mint spreads aggressively via runners. Grow in pots to prevent overtaking gardens.' },
+        { name: 'Bushy Growth', icon: '🍃', days: 'Day 31–60', color: '#3d7a3a', water: 'Every 1-2 days', fertilizer: 'Monthly organic feed', pest: 'Flea Beetles', disease: 'Mint Rust', tip: 'Harvest the top leaves frequently to force the plant to grow outwards instead of upwards.' },
+        { name: 'Harvest', icon: '✂️', days: 'Day 60+', color: '#c0392b', water: 'Maintain moisture', fertilizer: 'Stop before harvest', pest: 'Cutworms', disease: 'None', tip: 'Harvest before the plant flowers for the best essential oil concentration and flavor.' }
+      ]
+    };
+
+    CROP_DATA['Orchid'] = {
+      icon: '🌺', days: 150, soil: 'Bark chips / Sphagnum moss (Epiphytic)', water: 'Soak and dry thoroughly', sunlight: 'Bright Indirect Light', yield: 'Flowers lasting months', category: 'flower',
+      stages: [
+        { name: 'Vegetative Spike', icon: '🌿', days: 'Month 1–2', color: '#3d7a3a', water: 'Soak once a week', fertilizer: 'Orchid specific (20-20-20) weakly weekly', pest: 'Mealybugs, Scale', disease: 'Crown Rot', tip: 'Never let water sit in the crown of the plant. Water in the morning.' },
+        { name: 'Spike Development', icon: '🌱', days: 'Month 3–4', color: '#6ab04c', water: 'Maintain schedule', fertilizer: 'Switch to bloom booster (10-30-20)', pest: 'Thrips', disease: 'Root Rot', tip: 'A slight temperature drop at night triggers blooming spikes.' },
+        { name: 'Budding', icon: '🌸', days: 'Month 4.5', color: '#d4952a', water: 'Consistent moisture', fertilizer: 'Stop fertilizing', pest: 'Aphids', disease: 'Botrytis (spots on flowers)', tip: 'Do not move the plant; changes in light direction can cause buds to blast (drop off).' },
+        { name: 'Blooming', icon: '🌺', days: 'Month 5+', color: '#c0392b', water: 'Soak every 10 days', fertilizer: 'None', pest: 'None', disease: 'None', tip: 'Blooms can last up to 3 months. Cut the spike near the base once all flowers fall.' }
+      ]
+    };
+
+    CROP_DATA['Spinach'] = {
+      icon: '🥬', days: 45, soil: 'Nitrogen-rich Loam (pH 6.5–7.0)', water: 'High — keep cool and moist', sunlight: 'Partial Sun to Shade', yield: '3-4 harvests per plant', category: 'vegetable',
+      stages: [
+        { name: 'Direct Sowing', icon: '🪛', days: 'Day 1–7', color: '#8B5E3C', water: 'Daily light watering', fertilizer: 'Compost heavily before sowing', pest: 'Slugs', disease: 'Damping Off', tip: 'Spinach loves cool weather. Sow directly in early spring or late autumn.' },
+        { name: 'Seedling', icon: '🌱', days: 'Day 8–20', color: '#6ab04c', water: 'Consistent moisture', fertilizer: 'Liquid nitrogen feed', pest: 'Leaf Miners', disease: 'Downy Mildew', tip: 'Thin seedlings to 4 inches apart to allow large leaf development.' },
+        { name: 'Leaf Development', icon: '🥬', days: 'Day 21–35', color: '#3d7a3a', water: 'Every 2 days', fertilizer: 'Fish emulsion spray', pest: 'Aphids', disease: 'White Rust', tip: 'If weather gets too hot, use shade cloth to prevent bolting (going to seed).' },
+        { name: 'Harvest', icon: '✂️', days: 'Day 36–45', color: '#c0392b', water: 'Maintain moisture', fertilizer: 'None', pest: 'Caterpillars', disease: 'None', tip: 'Harvest outer leaves first, allowing the inner crown to continue producing new leaves.' }
+      ]
     };
 
     const REGIONAL_CROP_MAP = {
-      "Maharashtra": ["Sugarcane", "Cotton", "Grapes", "Pomegranate", "Onion", "Tomato", "Strawberry"],
-      "Karnataka": ["Sugarcane", "Rice", "Tomato", "Onion", "Mango", "Guava"],
-      "Punjab": ["Wheat", "Rice", "Cotton", "Sugarcane", "Potato"],
-      "Gujarat": ["Cotton", "Wheat", "Mango", "Tomato"],
-      "Uttar Pradesh": ["Sugarcane", "Wheat", "Rice", "Potato", "Mango", "Guava"],
-      "default": ["Wheat", "Rice", "Tomato", "Potato", "Onion", "Mango"]
+      "Maharashtra": ["Sugarcane", "Cotton", "Grapes", "Pomegranate", "Onion", "Tomato", "Strawberry", "Tulsi", "Aloe Vera", "Mint"],
+      "Karnataka": ["Sugarcane", "Rice", "Tomato", "Onion", "Mango", "Guava", "Orchid", "Mint", "Tulsi"],
+      "Punjab": ["Wheat", "Rice", "Cotton", "Sugarcane", "Potato", "Spinach", "Mint"],
+      "Gujarat": ["Cotton", "Wheat", "Mango", "Tomato", "Aloe Vera"],
+      "Uttar Pradesh": ["Sugarcane", "Wheat", "Rice", "Potato", "Mango", "Guava", "Tulsi", "Spinach"],
+      "default": ["Wheat", "Rice", "Tomato", "Potato", "Onion", "Mango", "Tulsi", "Mint", "Aloe Vera", "Spinach", "Orchid"]
     };
 
     function renderRegionalCrops() {
