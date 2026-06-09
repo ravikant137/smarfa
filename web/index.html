@@ -2186,6 +2186,7 @@
     }
 
     function renderResults(d, skipSave) {
+      window.currentScan = d; // Set the currently viewed scan so the Market page stays in sync
       var el = document.getElementById('scan-results');
       var sev = d.severity || 'warning';
       var confColor = (d.ai_confidence || 0) >= 60 ? 'var(--green)' : (d.ai_confidence || 0) >= 30 ? 'var(--yellow)' : 'var(--red)';
@@ -2329,13 +2330,14 @@
 
       setTimeout(function () {
         var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
-        if (history.length === 0) {
+        var lastScan = window.currentScan || history[history.length - 1];
+
+        if (!lastScan) {
           loading.style.display = 'none';
           empty.style.display = 'block';
           return;
         }
 
-        var lastScan = history[history.length - 1];
         if (lastScan.severity === 'healthy') {
           loading.style.display = 'none';
           empty.style.display = 'block';
