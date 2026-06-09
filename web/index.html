@@ -3247,13 +3247,74 @@
       ]
     };
 
+    CROP_DATA['Coconut'] = {
+      icon: '🥥', days: 1800, soil: 'Sandy Loam / Coastal (pH 5.2–8.0)', water: 'High (requires regular irrigation if dry)', sunlight: 'Full Sun', yield: '70-150 nuts/tree/year', category: 'tree',
+      stages: [
+        { name: 'Seed Nut Planting', icon: '🪛', days: 'Month 1–12', color: '#8B5E3C', water: 'Regular moisture', fertilizer: 'None initially, then light NPK', pest: 'Termites', disease: 'Bud Rot', tip: 'Plant seed nuts horizontally or vertically in nursery trenches.' },
+        { name: 'Seedling & Transplant', icon: '🌱', days: 'Year 1–3', color: '#6ab04c', water: 'Every 4-5 days', fertilizer: 'NPK 10:10:20 quarterly', pest: 'Rhinoceros Beetle', disease: 'Leaf Blight', tip: 'Transplant 1-year-old vigorous seedlings. Ensure pit is 1x1x1 meter.' },
+        { name: 'Vegetative Growth', icon: '🌴', days: 'Year 3–5', color: '#3d7a3a', water: 'Consistent irrigation', fertilizer: 'Increase Potassium heavily', pest: 'Red Palm Weevil', disease: 'Root Wilt', tip: 'Potassium is critical for trunk girth and early flowering.' },
+        { name: 'Flowering & Fruiting', icon: '🥥', days: 'Year 5+', color: '#d4952a', water: '200 Liters/tree/week', fertilizer: 'NPK + Magnesium Sulfate', pest: 'Mites', disease: 'Stem Bleeding', tip: 'Takes 11-12 months from flower opening to mature nut harvest.' }
+      ]
+    };
+
+    CROP_DATA['Lemon'] = {
+      icon: '🍋', days: 1095, soil: 'Well drained loamy (pH 5.5–6.5)', water: 'Moderate', sunlight: 'Full Sun', yield: '80-100 kg/tree', category: 'fruit',
+      stages: [
+        { name: 'Sapling', icon: '🌱', days: 'Month 1–12', color: '#8B5E3C', water: 'Every 3 days', fertilizer: 'Urea + FYM', pest: 'Citrus Butterfly', disease: 'Citrus Canker', tip: 'Remove all rootstock suckers below the graft union immediately.' },
+        { name: 'Growth', icon: '🌿', days: 'Year 1–3', color: '#3d7a3a', water: 'Weekly', fertilizer: 'NPK 10:10:10', pest: 'Leaf Miner', disease: 'Gummosis', tip: 'Prune dead wood. Do not allow the tree to fruit in the first 3 years.' },
+        { name: 'Flowering', icon: '🌸', days: 'Year 3+ (Spring)', color: '#d4952a', water: 'Reduce water to induce stress', fertilizer: 'Boron foliar spray', pest: 'Aphids', disease: 'Powdery Mildew', tip: 'Water stress (Bahar treatment) for 30 days induces heavy flowering.' },
+        { name: 'Fruiting', icon: '🍋', days: 'Year 3+ (Harvest)', color: '#c0392b', water: 'Regular watering', fertilizer: 'High Potassium', pest: 'Fruit Sucking Moth', disease: 'Scab', tip: 'Harvest when skin turns yellow and glossy. Do not pull, cut with clippers.' }
+      ]
+    };
+
+    CROP_DATA['Carrot'] = {
+      icon: '🥕', days: 90, soil: 'Loose, Sandy Loam, Stone-free (pH 6.0–6.8)', water: 'Consistent moisture', sunlight: 'Full Sun', yield: '10-15 tons/acre', category: 'vegetable',
+      stages: [
+        { name: 'Sowing', icon: '🪛', days: 'Day 1–15', color: '#8B5E3C', water: 'Keep soil surface constantly damp', fertilizer: 'Avoid fresh manure', pest: 'Wireworms', disease: 'Damping Off', tip: 'Seeds are tiny and take up to 2 weeks to germinate. Do not let soil crust over.' },
+        { name: 'Thinning', icon: '🌱', days: 'Day 16–30', color: '#6ab04c', water: '1 inch per week', fertilizer: 'Low Nitrogen, High Phosphorus', pest: 'Carrot Rust Fly', disease: 'Leaf Blight', tip: 'Crucial: Thin seedlings to 2-3 inches apart. Crowded carrots will not form roots.' },
+        { name: 'Root Bulking', icon: '🥕', days: 'Day 31–75', color: '#e8a838', water: 'Deep watering', fertilizer: 'Potassium sulfate', pest: 'Nematodes', disease: 'Alternaria', tip: 'Cover exposed shoulders (tops of roots) with soil to prevent them from turning green and bitter.' },
+        { name: 'Harvest', icon: '🌾', days: 'Day 76–90', color: '#c0392b', water: 'Stop watering 3 days prior', fertilizer: 'None', pest: 'Voles', disease: 'Soft Rot', tip: 'Harvest after a light frost for the sweetest flavor (frost converts starches to sugars).' }
+      ]
+    };
+
+    CROP_DATA['Ginger'] = {
+      icon: '🫚', days: 240, soil: 'Rich, well-drained, loose (pH 5.5–6.5)', water: 'High humidity, moist soil', sunlight: 'Partial Sun', yield: '8-10 tons/acre', category: 'spice',
+      stages: [
+        { name: 'Rhizome Planting', icon: '🪛', days: 'Month 1', color: '#8B5E3C', water: 'Lightly moist', fertilizer: 'Heavy compost', pest: 'Shoot Borer', disease: 'Soft Rot', tip: 'Plant seed rhizomes with at least two "eyes" facing upwards.' },
+        { name: 'Sprouting', icon: '🌱', days: 'Month 2–3', color: '#6ab04c', water: 'Consistent watering', fertilizer: 'NPK 10:10:10', pest: 'Scale', disease: 'Bacterial Wilt', tip: 'Ginger is a slow starter. Keep weed-free during this fragile early stage.' },
+        { name: 'Rhizome Development', icon: '🌿', days: 'Month 4–7', color: '#3d7a3a', water: 'Heavy watering', fertilizer: 'Potash application', pest: 'Rhizome Fly', disease: 'Leaf Spot', tip: 'Earthing up (piling soil around the base) is required every 45 days to allow rhizomes to expand.' },
+        { name: 'Drying & Harvest', icon: '🫚', days: 'Month 8', color: '#c0392b', water: 'Stop completely', fertilizer: 'None', pest: 'Nematodes', disease: 'Dry Rot', tip: 'Harvest when the leaves turn yellow and stems start falling over.' }
+      ]
+    };
+
+    CROP_DATA['Cabbage'] = {
+      icon: '🥬', days: 100, soil: 'Firm, fertile, moisture-retentive (pH 6.5–7.0)', water: 'High and consistent', sunlight: 'Full Sun', yield: '15-25 tons/acre', category: 'vegetable',
+      stages: [
+        { name: 'Nursery', icon: '🪛', days: 'Day 1–25', color: '#8B5E3C', water: 'Daily gentle watering', fertilizer: 'Seedling mix', pest: 'Flea Beetles', disease: 'Damping Off', tip: 'Sow in trays. Hardening off seedlings for 5 days before transplanting is critical.' },
+        { name: 'Transplant', icon: '🌱', days: 'Day 26–45', color: '#6ab04c', water: 'Deep watering immediately', fertilizer: 'High Nitrogen feed', pest: 'Cutworms', disease: 'Clubroot', tip: 'Plant deeply, up to the first set of true leaves, to ensure a sturdy base.' },
+        { name: 'Cupping & Head Formation', icon: '🥬', days: 'Day 46–80', color: '#3d7a3a', water: '1.5 inches per week', fertilizer: 'Calcium spray', pest: 'Cabbage Loopers, Aphids', disease: 'Black Rot', tip: 'Inconsistent watering during head formation causes the cabbage to split open.' },
+        { name: 'Harvest', icon: '✂️', days: 'Day 81–100', color: '#c0392b', water: 'Reduce water', fertilizer: 'None', pest: 'Diamondback Moth', disease: 'None', tip: 'Harvest when the head feels rock solid to the squeeze. Cut at the base with a sharp knife.' }
+      ]
+    };
+
+    CROP_DATA['Betel Leaf'] = {
+      icon: '🍃', days: 180, soil: 'Laterite / Clay Loam (pH 7.0–7.5)', water: 'High humidity, frequent light watering', sunlight: 'Heavy Shade (Requires artificial shade)', yield: 'Continuous leaf harvest', category: 'herb',
+      stages: [
+        { name: 'Cutting Establishment', icon: '🪛', days: 'Month 1–2', color: '#8B5E3C', water: 'Daily light misting', fertilizer: 'Neem cake + FYM', pest: 'Mealybugs', disease: 'Phytophthora Foot Rot', tip: 'Betel requires a highly controlled micro-climate. Construct a "Boreja" (shade house) before planting.' },
+        { name: 'Vine Growth', icon: '🌱', days: 'Month 3–4', color: '#6ab04c', water: 'Keep soil moist', fertilizer: 'Urea in split doses', pest: 'Red Spider Mite', disease: 'Leaf Spot', tip: 'Train the vines on bamboo or sesbania sticks. Do not let vines touch the ground.' },
+        { name: 'Lowering Vines', icon: '🌿', days: 'Month 5', color: '#3d7a3a', water: 'Consistent', fertilizer: 'Organic liquid manure', pest: 'Aphids', disease: 'Powdery Mildew', tip: 'Once vines reach 3 meters, they are carefully detached, coiled at the base, and buried to produce new shoots.' },
+        { name: 'Leaf Harvest', icon: '✂️', days: 'Month 6+', color: '#c0392b', water: 'Regular', fertilizer: 'Apply fertilizer after every 3 harvests', pest: 'Nematodes', disease: 'Wilt', tip: 'Harvest mature, fully expanded leaves using a thumb nail attached with an iron ring.' }
+      ]
+    };
+
     const REGIONAL_CROP_MAP = {
-      "Maharashtra": ["Sugarcane", "Cotton", "Grapes", "Pomegranate", "Onion", "Tomato", "Strawberry", "Tulsi", "Aloe Vera", "Mint"],
-      "Karnataka": ["Sugarcane", "Rice", "Tomato", "Onion", "Mango", "Guava", "Orchid", "Mint", "Tulsi"],
-      "Punjab": ["Wheat", "Rice", "Cotton", "Sugarcane", "Potato", "Spinach", "Mint"],
-      "Gujarat": ["Cotton", "Wheat", "Mango", "Tomato", "Aloe Vera"],
-      "Uttar Pradesh": ["Sugarcane", "Wheat", "Rice", "Potato", "Mango", "Guava", "Tulsi", "Spinach"],
-      "default": ["Wheat", "Rice", "Tomato", "Potato", "Onion", "Mango", "Tulsi", "Mint", "Aloe Vera", "Spinach", "Orchid"]
+      "Maharashtra": ["Sugarcane", "Cotton", "Grapes", "Pomegranate", "Onion", "Tomato", "Strawberry", "Tulsi", "Aloe Vera", "Mint", "Ginger", "Cabbage"],
+      "Karnataka": ["Sugarcane", "Rice", "Tomato", "Onion", "Mango", "Guava", "Orchid", "Mint", "Tulsi", "Coconut", "Betel Leaf", "Lemon"],
+      "Punjab": ["Wheat", "Rice", "Cotton", "Sugarcane", "Potato", "Spinach", "Mint", "Carrot", "Cabbage", "Lemon"],
+      "Gujarat": ["Cotton", "Wheat", "Mango", "Tomato", "Aloe Vera", "Lemon", "Cabbage", "Carrot"],
+      "Uttar Pradesh": ["Sugarcane", "Wheat", "Rice", "Potato", "Mango", "Guava", "Tulsi", "Spinach", "Ginger", "Carrot", "Lemon"],
+      "Kerala": ["Coconut", "Betel Leaf", "Ginger", "Guava", "Mango", "Banana", "Pepper", "Tulsi"],
+      "default": ["Wheat", "Rice", "Tomato", "Potato", "Onion", "Mango", "Tulsi", "Mint", "Aloe Vera", "Spinach", "Orchid", "Coconut", "Lemon", "Carrot", "Cabbage", "Ginger"]
     };
 
     function renderRegionalCrops() {
