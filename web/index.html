@@ -4120,13 +4120,59 @@
       if(!isAuto) window.toast('🚨 Threat broadcasted to farmers within 5km!', 'error');
       
       var reporter = source || 'You';
-      // Append real-time report block
+      var alertHtml = '<div style="font-size:24px;">🐗</div><div style="flex:1;"><div style="font-weight:700;font-size:14px;color:var(--text);">Wild Boar (Suar)</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">Reported by ' + reporter + ' • Just now</div></div><div style="font-size:11px;font-weight:700;color:var(--red);">LIVE</div>';
+
+      // Append real-time report block to dashboard feed
       var feed = document.getElementById('wildlife-alerts-feed');
       if(feed) {
         var newAlert = document.createElement('div');
         newAlert.style.cssText = 'background:#fef2f2;border:1px solid #fecaca;padding:12px 16px;border-radius:10px;display:flex;align-items:center;gap:12px;animation:slideInRight 0.3s ease-out;';
-        newAlert.innerHTML = '<div style="font-size:24px;">🐗</div><div style="flex:1;"><div style="font-weight:700;font-size:14px;color:var(--text);">Wild Boar (Suar)</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">Reported by ' + reporter + ' • Just now</div></div><div style="font-size:11px;font-weight:700;color:var(--red);">LIVE</div>';
+        newAlert.innerHTML = alertHtml;
         feed.insertBefore(newAlert, feed.firstChild);
+      }
+
+      // Append to the global Alerts tab
+      var globalAlerts = document.getElementById('alerts-list');
+      if(globalAlerts) {
+        var loading = globalAlerts.querySelector('.loading-overlay');
+        if (loading) loading.style.display = 'none';
+        
+        var globalAlertItem = document.createElement('div');
+        globalAlertItem.className = 'alert-item critical';
+        globalAlertItem.innerHTML = '<div class="alert-icon" style="font-size:20px;">🚨</div>' +
+                                    '<div class="alert-content">' +
+                                      '<h3>Wildlife Threat Detected</h3>' +
+                                      '<p>A Wild Boar (Suar) has been spotted nearby by ' + reporter + '. Please secure your fields.</p>' +
+                                      '<span class="alert-time">Just now</span>' +
+                                    '</div>';
+        globalAlerts.insertBefore(globalAlertItem, globalAlerts.firstChild);
+        
+        // Add red notification dot to the Alerts tab icon in nav
+        var alertsNavBtn = document.querySelector('nav .nav-item[onclick="switchTab(\\\'alerts\\\')"]');
+        if (alertsNavBtn && !alertsNavBtn.querySelector('.notif-dot')) {
+           alertsNavBtn.innerHTML += '<span class="notif-dot" style="position:absolute;top:6px;right:18px;width:10px;height:10px;background:var(--red);border-radius:50%;border:2px solid #fff;"></span>';
+        }
+      }
+
+      // Play Audio Alarm (Siren)
+      try {
+        var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        for (var i = 0; i < 3; i++) {
+          var osc = audioCtx.createOscillator();
+          var gain = audioCtx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(600, audioCtx.currentTime + (i * 0.4));
+          osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + (i * 0.4) + 0.2);
+          gain.gain.setValueAtTime(0, audioCtx.currentTime + (i * 0.4));
+          gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + (i * 0.4) + 0.1);
+          gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + (i * 0.4) + 0.3);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + (i * 0.4));
+          osc.stop(audioCtx.currentTime + (i * 0.4) + 0.3);
+        }
+      } catch(e) {
+        console.warn("Audio alert blocked by browser without user interaction");
       }
     }
 
