@@ -2403,7 +2403,28 @@
           renderStores(simulated);
         }
 
-        if (window.userLat && window.userLon) {
+        // If location isn't ready yet, fetch it synchronously before loading stores!
+        if (!window.userLat || !window.userLon) {
+          fetch('https://get.geojs.io/v1/ip/geo.json')
+            .then(function(res){return res.json()})
+            .then(function(data){ 
+              if(data.latitude && data.longitude) {
+                window.userLat = parseFloat(data.latitude);
+                window.userLon = parseFloat(data.longitude);
+                if (window.setupLocation) window.setupLocation(window.userLat, window.userLon);
+                fetchOverpassStores(); // Now fetch stores
+              } else {
+                renderSimulatedStores();
+              }
+            })
+            .catch(function(e){
+              renderSimulatedStores();
+            });
+        } else {
+          fetchOverpassStores();
+        }
+
+        function fetchOverpassStores() {
           var lat = window.userLat;
           var lon = window.userLon;
           var query = '[out:json][timeout:15];nwr(around:50000,' + lat + ',' + lon + ')["shop"~"agrarian|garden_centre|hardware"];out body 15;';
@@ -2469,8 +2490,6 @@
             console.error("Market API error:", err);
             renderSimulatedStores(); // Safe fallback only if completely offline
           });
-        } else {
-          renderSimulatedStores(); // Fallback if GPS is blocked
         }
 
         loading.style.display = 'none';
