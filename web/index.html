@@ -2136,11 +2136,23 @@
               var dist = getHammingDistance(currentHash, history[i].ahash);
               if (dist <= 5) { // 92%+ visual match
                 setTimeout(() => {
-                  renderResults(history[i], true);
+                  // Clone the cached scan so it's treated as a new unique event for today
+                  var clonedScan = JSON.parse(JSON.stringify(history[i]));
+                  
+                  renderResults(clonedScan, false); // false = DO save to history!
                   results.style.display = 'block';
                   loading.style.display = 'none';
                   btn.disabled = false;
-                  window.toast('⚡ Loaded from Cache! Saved API Cost.', 'success');
+                  
+                  // Trigger Push Notification/Alert for the cached result so user gets warned!
+                  var sev = clonedScan.severity || 'warning';
+                  if (sev === 'critical') {
+                    window.toast('⚡ Cached | 🚨 CRITICAL: ' + (clonedScan.health_assessment || 'Severe issue detected!'), 'error');
+                  } else if (sev === 'warning') {
+                    window.toast('⚡ Cached | ⚠️ WARNING: ' + (clonedScan.health_assessment || 'Potential issue detected.'), 'warning');
+                  } else {
+                    window.toast('⚡ Cached | ✅ Crop is healthy!', 'success');
+                  }
                 }, 800); // add a tiny simulated loading time
                 return;
               }
