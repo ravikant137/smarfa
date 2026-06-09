@@ -1403,27 +1403,44 @@
     var AGRO_API_KEY = '8518d290ab4e6f4ca86ee6c7d841b3fb';
 
 
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(function (position) {
-        window.userLat = position.coords.latitude;
-        window.userLon = position.coords.longitude;
-        if (window.APP) { window.APP.userLat = window.userLat; window.APP.userLon = window.userLon; }
-        
-        // Dynamically fetch actual city/district name
-        fetch('https://nominatim.openstreetmap.org/reverse?lat=' + window.userLat + '&lon=' + window.userLon + '&format=json')
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            if (data && data.address) {
-              var city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || 'your area';
-              var locEl = document.getElementById('market-location');
-              if (locEl) locEl.textContent = city;
-            }
-          }).catch(function(e){});
+    function setupLocation(lat, lon) {
+      window.userLat = lat;
+      window.userLon = lon;
+      if (window.APP) { window.APP.userLat = window.userLat; window.APP.userLon = window.userLon; }
+      
+      // Dynamically fetch actual city/district name
+      fetch('https://nominatim.openstreetmap.org/reverse?lat=' + window.userLat + '&lon=' + window.userLon + '&format=json')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data && data.address) {
+            var city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district || 'your area';
+            var locEl = document.getElementById('market-location');
+            if (locEl) locEl.textContent = city;
+          }
+        }).catch(function(e){});
 
-        // Use modular weather fetch (weather.js)
-        if (window.fetchWeatherData) window.fetchWeatherData(window.userLat, window.userLon);
-        else fetchWeatherForecast(window.userLat, window.userLon);
-      });
+      // Use modular weather fetch (weather.js)
+      if (window.fetchWeatherData) window.fetchWeatherData(window.userLat, window.userLon);
+      else fetchWeatherForecast(window.userLat, window.userLon);
+    }
+
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        function (position) { setupLocation(position.coords.latitude, position.coords.longitude); },
+        function (error) {
+          // IP Fallback
+          fetch('http://ip-api.com/json/')
+            .then(function(res){return res.json()})
+            .then(function(data){ if(data.lat && data.lon) setupLocation(data.lat, data.lon); })
+            .catch(function(e){});
+        }
+      );
+    } else {
+      // IP Fallback
+      fetch('http://ip-api.com/json/')
+        .then(function(res){return res.json()})
+        .then(function(data){ if(data.lat && data.lon) setupLocation(data.lat, data.lon); })
+        .catch(function(e){});
     }
 
     let currentUser = { username: "Admin", id: "dev" };
@@ -2378,11 +2395,11 @@
         }
 
         if (window.userLat && window.userLon) {
-          // Calculate bounding box (~15km radius)
+          // Calculate bounding box (~50km radius to ensure we find real stock)
           var lat = window.userLat;
           var lon = window.userLon;
-          var r = 15 / 111.32; // 15km in degrees
-          var query = '[out:json][timeout:15];(node["shop"="agrarian"](' + (lat-r) + ',' + (lon-r) + ',' + (lat+r) + ',' + (lon+r) + ');node["shop"="garden_centre"](' + (lat-r) + ',' + (lon-r) + ',' + (lat+r) + ',' + (lon+r) + '););out body 5;';
+          var r = 50 / 111.32; // 50km in degrees
+          var query = '[out:json][timeout:15];(node["shop"~"agrarian|garden_centre|hardware"](' + (lat-r) + ',' + (lon-r) + ',' + (lat+r) + ',' + (lon+r) + '););out body 15;';
           
           fetch('https://overpass-api.de/api/interpreter', {
             method: 'POST',
@@ -2413,17 +2430,16 @@
               realStores.sort(function(a,b) { return parseFloat(a.distance) - parseFloat(b.distance); });
               renderStores(realStores.slice(0, 5));
             } else {
-              // Fallback to mock stores if no OpenStreetMap data found
-              renderStores(fallbackStores);
+              storesListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);"><div style="font-size:32px;margin-bottom:8px;">📍</div>No verified agricultural stores found within 50km.</div>';
             }
           })
           .catch(function(err) {
             console.error("Overpass API error:", err);
-            renderStores(fallbackStores);
+            storesListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);">Failed to load local stores.</div>';
           });
         } else {
-          // No GPS permission, use fallback
-          renderStores(fallbackStores);
+          // No GPS permission
+          storesListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">Location access is required to find local stores.</div>';
         }
 
         loading.style.display = 'none';
