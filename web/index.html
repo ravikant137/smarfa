@@ -2369,9 +2369,9 @@
         var aiProduct = lastScan.structured && lastScan.structured.product;
         var activeIngredient = extractIngredient((aiProduct && aiProduct.active_ingredient) || '');
         
-        var finalDisplayName = (aiProduct && aiProduct.commercial_name) || treatmentName || activeIngredient || 'AI Treatment';
-        var brandSubtitle = (aiProduct && aiProduct.commercial_name) ? treatmentName : activeIngredient;
-        if (brandSubtitle.toLowerCase() === finalDisplayName.toLowerCase()) brandSubtitle = '';
+        var finalDisplayName = treatmentName || activeIngredient || (aiProduct && aiProduct.commercial_name) || 'AI Treatment';
+        var brandSubtitle = (aiProduct && aiProduct.commercial_name) ? aiProduct.commercial_name : activeIngredient;
+        if (brandSubtitle && brandSubtitle.toLowerCase() === finalDisplayName.toLowerCase()) brandSubtitle = '';
 
         // ── REAL COMMERCIAL PRODUCT CATALOG ──
         var marketCatalog = {
@@ -2386,7 +2386,7 @@
         };
 
         var catalogEntry = null;
-        var searchTarget = (finalDisplayName + ' ' + activeIngredient).toLowerCase();
+        var searchTarget = finalDisplayName.toLowerCase();
         Object.keys(marketCatalog).forEach(function(k) {
           if (searchTarget.includes(k)) catalogEntry = marketCatalog[k];
         });
@@ -2402,10 +2402,12 @@
         
         var imgContainer = document.getElementById('market-treatment-card').children[0];
         
-        // Ultra-safe unblockable fallback image (base64 SVG)
+        // AI Image Generation fallback if product is not in our real catalog
+        var aiImagePrompt = encodeURIComponent('A professional product photo of an agricultural bottle labeled "' + finalDisplayName + '", pesticide chemical, clean white background, high quality');
+        var aiFallback = 'https://image.pollinations.ai/prompt/' + aiImagePrompt + '?nologo=true&width=400&height=400';
         var safeFallback = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZmFmYyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iI2NidDU1ZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+SijwvdGV4dD48dGV4dCB4PSI1MCUiIHk9Ijc1JSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5NGEzYjgiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFncmljdWx0dXJhbCBQcm9kdWN0PC90ZXh0Pjwvc3ZnPg==';
         
-        var productImgUrl = catalogEntry ? catalogEntry.image : safeFallback;
+        var productImgUrl = catalogEntry ? catalogEntry.image : aiFallback;
         imgContainer.innerHTML = '<img src="' + productImgUrl + '" alt="' + finalDisplayName + '" onerror="this.onerror=null; this.src=\'' + safeFallback + '\';" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:8px;background:#f8fafc;">';
 
         imgContainer.style.overflow = 'hidden';
