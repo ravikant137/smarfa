@@ -2395,46 +2395,17 @@
         }
 
         if (window.userLat && window.userLon) {
-          // Calculate bounding box (~50km radius to ensure we find real stock)
-          var lat = window.userLat;
-          var lon = window.userLon;
-          var r = 50 / 111.32; // 50km in degrees
-          var query = '[out:json][timeout:15];(node["shop"~"agrarian|garden_centre|hardware"](' + (lat-r) + ',' + (lon-r) + ',' + (lat+r) + ',' + (lon+r) + '););out body 15;';
-          
-          fetch('https://overpass-api.de/api/interpreter', {
-            method: 'POST',
-            body: query
-          })
+          fetch(API + '/api/v1/inventory?lat=' + window.userLat + '&lon=' + window.userLon)
           .then(function(res) { return res.json(); })
-          .then(function(data) {
-            if (data && data.elements && data.elements.length > 0) {
-              var realStores = data.elements.map(function(el) {
-                // Calculate distance using Haversine formula
-                var dLat = (el.lat - lat) * Math.PI / 180;
-                var dLon = (el.lon - lon) * Math.PI / 180;
-                var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                        Math.cos(lat * Math.PI / 180) * Math.cos(el.lat * Math.PI / 180) *
-                        Math.sin(dLon/2) * Math.sin(dLon/2);
-                var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                var distKm = (6371 * c).toFixed(1);
-
-                return {
-                  name: el.tags.name || ("Agri Store (" + el.tags.shop + ")"),
-                  distance: distKm + " km",
-                  stock: Math.floor(Math.random() * 40), // Mock random stock
-                  price: 200 + Math.floor(Math.random() * 150), // Mock random price
-                  color: "var(--green)"
-                };
-              });
-              // Sort by distance
-              realStores.sort(function(a,b) { return parseFloat(a.distance) - parseFloat(b.distance); });
-              renderStores(realStores.slice(0, 5));
+          .then(function(json) {
+            if (json.success && json.data && json.data.length > 0) {
+              renderStores(json.data);
             } else {
               storesListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);"><div style="font-size:32px;margin-bottom:8px;">📍</div>No verified agricultural stores found within 50km.</div>';
             }
           })
           .catch(function(err) {
-            console.error("Overpass API error:", err);
+            console.error("Market Inventory API error:", err);
             storesListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);">Failed to load local stores.</div>';
           });
         } else {
