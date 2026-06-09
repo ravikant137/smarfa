@@ -11,16 +11,17 @@ export default async function handler(req, res) {
   const matchStr = (query + ' ' + treatment).toLowerCase();
 
   // 1. Verified Indian Agricultural Database
+  // 1. Verified Indian Agricultural Database (Names only, images fetched dynamically to prevent dead links)
   const productsDB = [
-    { keys: ["spinosad"], name: "Katyayani Spinosad 2.5% SC", image: "https://wsrv.nl/?url=m.media-amazon.com/images/I/51r+hXo1RJL._SX679_.jpg", company: "Katyayani Organics", price: "₹450" },
-    { keys: ["copper", "blitox"], name: "Blitox 50W Copper Fungicide", image: "https://wsrv.nl/?url=m.media-amazon.com/images/I/61WfQk5yJQL._SX679_.jpg", company: "Tata Rallis", price: "₹380" },
-    { keys: ["neem"], name: "Plantic Organic Neem Oil", image: "https://wsrv.nl/?url=m.media-amazon.com/images/I/61r5tS0k1JL._SX679_.jpg", company: "Plantic", price: "₹299" },
-    { keys: ["imidacloprid", "confidor"], name: "Confidor Imidacloprid", image: "https://wsrv.nl/?url=m.media-amazon.com/images/I/51T9w9w9pQL._SX679_.jpg", company: "Bayer CropScience", price: "₹520" },
-    { keys: ["mancozeb", "dithane"], name: "UPL Indofil M-45 Mancozeb", image: "https://wsrv.nl/?url=m.media-amazon.com/images/I/71uVv8QOIfL._SX679_.jpg", company: "UPL Ltd", price: "₹310" },
-    { keys: ["chlorothalonil", "daconil"], name: "Syngenta Daconil 2787 Fungicide", image: "https://wsrv.nl/?url=m.media-amazon.com/images/I/41-b0K0P0jL._AC_SY879_.jpg", company: "Syngenta", price: "₹850" },
-    { keys: ["trichoderma"], name: "Sanjeevni Trichoderma Viride", image: "https://wsrv.nl/?url=m.media-amazon.com/images/I/61k2a03rG6L._SX679_.jpg", company: "Katyayani", price: "₹180" },
-    { keys: ["azoxystrobin", "amistar"], name: "Amistar Azoxystrobin 23% SC", image: "https://wsrv.nl/?url=m.media-amazon.com/images/I/51wY84a-mBL._SX679_.jpg", company: "Syngenta", price: "₹1200" },
-    { keys: ["tricyclazole", "beam"], name: "Beam 75 WP Tricyclazole", image: "https://wsrv.nl/?url=m.media-amazon.com/images/I/51D8zD1-mBL._SX679_.jpg", company: "Dow AgroSciences", price: "₹650" }
+    { keys: ["spinosad"], name: "Katyayani Spinosad 2.5% SC", company: "Katyayani Organics", price: "₹450" },
+    { keys: ["copper", "blitox"], name: "Blitox 50W Copper Fungicide", company: "Tata Rallis", price: "₹380" },
+    { keys: ["neem"], name: "Plantic Organic Neem Oil", company: "Plantic", price: "₹299" },
+    { keys: ["imidacloprid", "confidor"], name: "Confidor Imidacloprid", company: "Bayer CropScience", price: "₹520" },
+    { keys: ["mancozeb", "dithane"], name: "UPL Indofil M-45 Mancozeb", company: "UPL Ltd", price: "₹310" },
+    { keys: ["chlorothalonil", "daconil"], name: "Syngenta Daconil 2787 Fungicide", company: "Syngenta", price: "₹850" },
+    { keys: ["trichoderma"], name: "Sanjeevni Trichoderma Viride", company: "Katyayani", price: "₹180" },
+    { keys: ["azoxystrobin", "amistar"], name: "Amistar Azoxystrobin 23% SC", company: "Syngenta", price: "₹1200" },
+    { keys: ["tricyclazole", "beam"], name: "Beam 75 WP Tricyclazole", company: "Dow AgroSciences", price: "₹650" }
   ];
 
   let matchedProduct = null;
@@ -30,20 +31,20 @@ export default async function handler(req, res) {
     }
   }
 
-  if (matchedProduct) {
-    return res.status(200).json({ success: true, data: matchedProduct });
-  }
+  const finalName = matchedProduct ? matchedProduct.name : displayName;
+  const company = matchedProduct ? matchedProduct.company : "Verified Web Result";
+  const price = matchedProduct ? matchedProduct.price : "Check Local Store";
+  const searchForImage = encodeURIComponent(finalName + ' pesticide');
 
-  // 2. Dynamic Yahoo Web Scraper Fallback
+  // 2. Dynamic Web Scraper (Fetches fresh Bing thumbnails so links never 404)
   try {
-    const searchUrl = `https://images.search.yahoo.com/search/images?p=${encodeURIComponent(searchStr)}`;
+    const searchUrl = `https://images.search.yahoo.com/search/images?p=${searchForImage}`;
     const searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     if (searchRes.ok) {
       const html = await searchRes.text();
       const match = html.match(/src=["'](https:\/\/tse[0-9]\.mm\.bing\.net[^"']+)["']/);
       if (match && match[1]) {
-        const proxiedUrl = `https://wsrv.nl/?url=${match[1].replace(/^https?:\/\//, '')}`;
-        return res.status(200).json({ success: true, data: { name: displayName, image: proxiedUrl, company: "Verified Web Result", price: "Check Local Store", isWebScraped: true }});
+        return res.status(200).json({ success: true, data: { name: finalName, image: match[1], company: company, price: price, isWebScraped: true }});
       }
     }
   } catch (error) { console.error("Web scraper error:", error); }
