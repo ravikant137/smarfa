@@ -54,8 +54,8 @@ export default async function handler(req, res) {
       impacts.push({ type: 'critical', title: `🌊 Heavy Downpour Alert (~${futureRainVolume.toFixed(1)}mm)`, body: 'High risk of waterlogging and root rot. Clear drainage channels.' });
       topImpact = { text: 'Heavy Rain', color: 'red', icon: '🌊' };
     } else if (max3DaysRain > 50) {
-      impacts.push({ type: 'critical', title: `🌧️ High Rain Risk (${Math.round(max3DaysRain)}%)`, body: 'Delay pesticide/fertilizer sprays. Risk of fungal diseases (Blight, Mildew).' });
-      if (topImpact.text === 'Optimal') topImpact = { text: 'Fungal Risk', color: 'red', icon: '🌧️' };
+      impacts.push({ type: 'critical', title: `🦠 High Fungal Blight Risk (${Math.round(max3DaysRain)}% Moisture Probability)`, body: 'High humidity and sustained moisture expected. Preventive Fungicide spray highly recommended.' });
+      if (topImpact.text === 'Optimal') topImpact = { text: 'Fungal Risk', color: 'red', icon: '🦠' };
     } else if (futureRainVolume >= 10 && futureRainVolume <= 40 && pastRainVolume <= 20) {
       impacts.push({ type: 'good', title: `💧 Expected Moisture Recharge (~${futureRainVolume.toFixed(1)}mm)`, body: 'Soil will be hydrated. Skip next 1-2 irrigation cycles.' });
     } else if (max3DaysRain > 20) {

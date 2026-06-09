@@ -47,7 +47,7 @@ Return ONLY a valid JSON object. Fill each field based on the actual image — d
       "dosage": "Mixing ratio only, e.g. 0.6g per Liter of water.",
       "prevention": "Cultural prevention steps.",
       "irrigation_adjustment": "Increase / Decrease / Maintain.",
-      "soil_correction": "Fertilizer or pH fix needed.",
+      "soil_correction": "Fertilizer or pH fix needed. (Include specific NPK ratios if applicable).",
       "flower_care": "Pruning or bloom tips if flower plant.",
       "fruit_care": "Ripening or harvest tips if fruit plant."
     },

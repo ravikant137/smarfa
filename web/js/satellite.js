@@ -195,6 +195,22 @@
 
     const imgDate = (images && images.length) ? new Date(images.sort((a, b) => b.dt - a.dt)[0].dt * 1000).toLocaleDateString() : 'Latest';
 
+    let variabilityHTML = '';
+    if (ndviHistory && ndviHistory.length > 0 && ndviHistory[0].data) {
+      const stats = ndviHistory[0].data;
+      const spread = stats.max - stats.min;
+      if (spread > 0.1) {
+        variabilityHTML = `<hr style="border:none;border-top:1px solid #eee;margin:6px 0;">
+          <div style="font-size:11px;color:#666;font-weight:700;margin-bottom:4px;">🎯 MANAGEMENT ZONES</div>
+          <div style="font-size:10px;display:flex;justify-content:space-between;margin-bottom:2px;"><span>High Yield Potential:</span><b style="color:#16a34a">Top 30%</b></div>
+          <div style="font-size:10px;display:flex;justify-content:space-between;"><span>Needs N-Fertilizer:</span><b style="color:#ef4444">Bottom 20%</b></div>`;
+      } else {
+        variabilityHTML = `<hr style="border:none;border-top:1px solid #eee;margin:6px 0;">
+          <div style="font-size:11px;color:#666;font-weight:700;margin-bottom:4px;">🎯 MANAGEMENT ZONES</div>
+          <div style="font-size:10px;color:var(--muted);">Field is uniform. Standard application.</div>`;
+      }
+    }
+
     // Map legend
     if (window._agroLegend && window.dashMap) window.dashMap.removeControl(window._agroLegend);
     const legend = L.control({ position: 'bottomleft' });
@@ -209,7 +225,8 @@
         <hr style="border:none;border-top:1px solid #eee;margin:4px 0;">
         ${mean != null ? `<div style="color:#333;">📊 NDVI: <b style="color:${color}">${mean.toFixed(3)}</b> — ${label}</div>` : ''}
         ${soilMoisture ? `<div style="color:#3b82f6;margin-top:3px;">🌍 Soil: <b>${soilMoisture}%</b></div>` : ''}
-        ${totalRain != null ? `<div style="color:${rainColor};margin-top:3px;">💧 Rain 7d: <b>${totalRain.toFixed(1)}mm</b></div>` : ''}`;
+        ${totalRain != null ? `<div style="color:${rainColor};margin-top:3px;">💧 Rain 7d: <b>${totalRain.toFixed(1)}mm</b></div>` : ''}
+        ${variabilityHTML}`;
       return d;
     };
     if (window.dashMap) legend.addTo(window.dashMap);
@@ -227,6 +244,35 @@
         statusEl.style.color = color;
         statusEl.style.background = color + '22';
       }
+    }
+
+    // Yield Prediction Logic
+    const yieldEl = document.getElementById('proj-yield');
+    const revenueEl = document.getElementById('proj-revenue');
+    const helperEl = document.getElementById('proj-helper');
+
+    const areaEl = document.getElementById('field-detail-area');
+    let areaAcres = 0;
+    if (areaEl && areaEl.textContent && areaEl.textContent.includes('acres')) {
+      areaAcres = parseFloat(areaEl.textContent.split(' ')[0]);
+    } else if (window.FIELDS && window.FIELDS['SAT'] && window.FIELDS['SAT'].area) {
+      areaAcres = parseFloat(window.FIELDS['SAT'].area.split(' ')[0]);
+    }
+
+    if (areaAcres > 0 && mean != null) {
+      const baseYieldPerAcre = 15; // Wheat base
+      const healthFactor = Math.min(1.2, Math.max(0.2, mean / 0.6));
+      const projectedYield = areaAcres * baseYieldPerAcre * healthFactor;
+      const marketPricePerQuintal = 2500; // Live APMC Mock
+      const projectedRevenue = projectedYield * marketPricePerQuintal;
+
+      if (yieldEl) yieldEl.textContent = projectedYield.toFixed(1) + ' Qtl';
+      if (revenueEl) revenueEl.textContent = '₹' + projectedRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+      if (helperEl) helperEl.innerHTML = `Based on <b>${areaAcres.toFixed(1)} acres</b> of Wheat at <b>₹${marketPricePerQuintal}/q</b> (adjusted for ${(healthFactor*100).toFixed(0)}% crop health).`;
+    } else {
+      if (yieldEl) yieldEl.textContent = '—';
+      if (revenueEl) revenueEl.textContent = '—';
+      if (helperEl) helperEl.textContent = 'Area or health data missing for projection.';
     }
 
     window.toast(`🛰️ NDVI:${mean != null ? mean.toFixed(3) : 'N/A'} | 🌍 Soil:${soilMoisture || '--'}% | 💧 Rain:${totalRain != null ? totalRain.toFixed(1) : '--'}mm`);

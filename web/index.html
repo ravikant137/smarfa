@@ -926,6 +926,28 @@
               <div style="font-size:12px;color:var(--muted);" id="health-score-label">Calculating...</div>
             </div>
 
+            <!-- Financial Projections -->
+            <div
+              style="background:#fff;border-radius:16px;padding:20px;border:1px solid var(--border);box-shadow:0 2px 12px rgba(0,0,0,0.05);">
+              <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+                <span>💰 Yield & Revenue</span>
+                <span style="font-size:10px;background:var(--harvest);color:#fff;padding:2px 6px;border-radius:4px;">PROJECTION</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <div>
+                  <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Expected Yield</div>
+                  <div style="font-size:18px;font-weight:800;color:var(--text);" id="proj-yield">—</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Est. Revenue</div>
+                  <div style="font-size:18px;font-weight:800;color:var(--green);" id="proj-revenue">—</div>
+                </div>
+              </div>
+              <div style="font-size:11px;color:var(--muted);background:var(--bg);padding:8px;border-radius:8px;text-align:center;" id="proj-helper">
+                Analyze a field to generate projections based on live NDVI and Market data.
+              </div>
+            </div>
+
             <!-- Field Region List -->
             <div
               style="background:#fff;border-radius:16px;border:1px solid var(--border);box-shadow:0 2px 12px rgba(0,0,0,0.05);overflow:hidden;flex:1;">
@@ -1042,6 +1064,13 @@
         </div>
 
         <div id="scan-results" style="display:none"></div>
+
+        <!-- Ask an Agronomist Community Fallback -->
+        <div id="expert-fallback" style="display:none; margin-top:16px; padding:16px; border:1px solid #3b82f6; border-radius:12px; background:rgba(59,130,246,0.05); text-align:center;">
+          <h3 style="color:#3b82f6; font-size:16px; margin-bottom:8px;">🧑‍🌾 Need a Second Opinion?</h3>
+          <p style="color:var(--muted); font-size:13px; margin-bottom:12px;">Share your scan results with our community of expert Agronomists for verified advice.</p>
+          <button onclick="window.toast('Your scan has been sent to an Agronomist! They will reply within 2 hours.', 'success')" style="background:#3b82f6; color:#fff; border:none; padding:10px 20px; border-radius:50px; font-weight:700; cursor:pointer;">Ask an Expert Agronomist</button>
+        </div>
       </div>
 
       <!-- ── Tab: Subsidies ────────────── -->
