@@ -1300,17 +1300,7 @@
             </div>
           </div>
 
-          <div style="margin-bottom:24px;">
-            <h3
-              style="font-size:18px;font-weight:800;margin-bottom:16px;color:var(--text);display:flex;justify-content:space-between;align-items:center;">
-              Nearby Sellers in Stock
-              <span style="font-size:13px;color:var(--muted);font-weight:600;" id="market-local-city">📍
-                Searching...</span>
-            </h3>
-            <div id="market-stores-list" style="display:flex;flex-direction:column;gap:12px;">
-              <!-- Generated dynamically -->
-            </div>
-          </div>
+
         </div>
 
         <div id="marketplace-empty" style="text-align:center;padding:60px 20px;display:block;">
@@ -2330,51 +2320,7 @@
             imgContainer.innerHTML = '<img src="' + safeFallback + '" alt="Fallback" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:0;background:#f8fafc;">';
           });
 
-        // ── Nearby Stores (Local) via Inventory API ──
-        fetch(apiUrl + '/api/v1/inventory')
-          .then(function(res) { return res.json(); })
-          .then(function(json) {
-            var stores = json.success ? json.data : [];
-            var storesHtml = '';
-            
-            var alternatives = (aiProduct && aiProduct.alternatives) || [];
-            var brandsList = [finalDisplayName];
-            if (alternatives && alternatives.length) {
-              brandsList = brandsList.concat(alternatives);
-            }
 
-            stores.forEach(function (s, idx) {
-              var storeBrand = brandsList[idx % brandsList.length];
-              var isOutOfStock = s.stock <= 0;
-              var stockLabel = isOutOfStock ? 'Out of Stock' : (s.stock < 5 ? 'Low Stock' : 'In Stock');
-              var mapQuery = encodeURIComponent(s.name + ' agricultural store near me');
-              var buyBtn = isOutOfStock ?
-                '<button disabled style="background:#e2e8f0;color:#94a3b8;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:not-allowed;">Unavailable</button>' :
-                '<button onclick="openCheckout(&apos;' + s.name + '&apos;, &apos;₹' + s.price + '&apos;, &apos;' + storeBrand + '&apos;)" style="background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(61,122,58,0.2);">Buy Locally</button>';
-
-              storesHtml += '<div style="background:#f8fafc;border:1px solid #e2e8f0;padding:16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">' +
-                '<div style="flex:1;min-width:150px;">' +
-                '<div style="font-weight:800;font-size:15px;color:var(--text);">' + s.name + '</div>' +
-                '<div style="font-size:12px;color:var(--muted);margin-top:2px;">📍 ' + s.distance + ' away • <a href="https://www.google.com/maps/search/?api=1&query=' + mapQuery + '" target="_blank" style="color:var(--green);text-decoration:none;">View on Map</a></div>' +
-                '<div style="font-size:13px;color:var(--green-d);background:rgba(16,185,129,0.1);padding:4px 8px;border-radius:4px;display:inline-block;font-weight:700;margin-top:8px;">' + (isOutOfStock ? '❌' : '✅') + ' ' + stockLabel + ': ' + storeBrand + ' (' + s.stock + ' left)</div>' +
-                '</div>' +
-                '<div style="text-align:right;margin-right:12px;">' +
-                '<div style="font-weight:900;font-size:16px;color:var(--text);">₹' + s.price + '</div>' +
-                '<div style="font-size:11px;font-weight:700;color:' + s.color + ';margin-top:2px;">' + stockLabel + '</div>' +
-                '</div>' +
-                '<div>' + buyBtn + '</div>' +
-                '</div>';
-            });
-
-            document.getElementById('market-stores-list').innerHTML = storesHtml;
-          })
-          .catch(function(err) {
-            console.error("Inventory API error:", err);
-            document.getElementById('market-stores-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);">Failed to load local stores.</div>';
-          });
-
-        var mCity = document.getElementById('market-location') ? document.getElementById('market-location').textContent : "Nearby";
-        document.getElementById('market-local-city').textContent = "📍 " + mCity;
 
         loading.style.display = 'none';
         content.style.display = 'block';
