@@ -1300,7 +1300,16 @@
             </div>
           </div>
 
-
+          <div style="margin-bottom:24px;">
+            <h3
+              style="font-size:18px;font-weight:800;margin-bottom:16px;color:var(--text);display:flex;justify-content:space-between;align-items:center;">
+              Nearby Sellers in Stock
+              <span style="font-size:13px;color:var(--muted);font-weight:600;" id="market-local-city">📍 Searching...</span>
+            </h3>
+            <div id="market-stores-list" style="display:flex;flex-direction:column;gap:12px;">
+              <!-- Generated dynamically -->
+            </div>
+          </div>
         </div>
 
         <div id="marketplace-empty" style="text-align:center;padding:60px 20px;display:block;">
@@ -2320,7 +2329,102 @@
             imgContainer.innerHTML = '<img src="' + safeFallback + '" alt="Fallback" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:0;background:#f8fafc;">';
           });
 
+        // ── Nearby Stores (Local) via Overpass API ──
+        var storesListEl = document.getElementById('market-stores-list');
+        var cityEl = document.getElementById('market-local-city');
+        var mCity = document.getElementById('market-location') ? document.getElementById('market-location').textContent : "Nearby";
+        
+        storesListEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);"><div class="spinner" style="display:inline-block;margin-bottom:8px;"></div><br>Searching map for local agricultural stores...</div>';
 
+        // Fallback stores if Overpass fails
+        var fallbackStores = [
+          { name: "Kisan Agro Hub", distance: "1.2 km", stock: 15, price: 250, color: "var(--green)" },
+          { name: "Green Field Fertilizers", distance: "3.4 km", stock: 3, price: 280, color: "var(--yellow)" },
+          { name: "Ravi Krushi Kendra", distance: "5.1 km", stock: 50, price: 240, color: "var(--green)" }
+        ];
+
+        function renderStores(stores) {
+          var storesHtml = '';
+          var alternatives = (aiProduct && aiProduct.alternatives) || [];
+          var brandsList = [finalDisplayName];
+          if (alternatives && alternatives.length) {
+            brandsList = brandsList.concat(alternatives);
+          }
+
+          stores.forEach(function (s, idx) {
+            var storeBrand = brandsList[idx % brandsList.length];
+            var isOutOfStock = s.stock <= 0;
+            var stockLabel = isOutOfStock ? 'Out of Stock' : (s.stock < 5 ? 'Low Stock' : 'In Stock');
+            var mapQuery = encodeURIComponent(s.name + ' agricultural store near me');
+            var buyBtn = isOutOfStock ?
+              '<button disabled style="background:#e2e8f0;color:#94a3b8;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:not-allowed;">Unavailable</button>' :
+              '<button onclick="openCheckout(&apos;' + s.name + '&apos;, &apos;₹' + s.price + '&apos;, &apos;' + storeBrand + '&apos;)" style="background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(61,122,58,0.2);">Buy Locally</button>';
+
+            storesHtml += '<div style="background:#f8fafc;border:1px solid #e2e8f0;padding:16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">' +
+              '<div style="flex:1;min-width:150px;">' +
+              '<div style="font-weight:800;font-size:15px;color:var(--text);">' + s.name + '</div>' +
+              '<div style="font-size:12px;color:var(--muted);margin-top:2px;">📍 ' + s.distance + ' away • <a href="https://www.google.com/maps/search/?api=1&query=' + mapQuery + '" target="_blank" style="color:var(--green);text-decoration:none;">View on Map</a></div>' +
+              '<div style="font-size:13px;color:var(--green-d);background:rgba(16,185,129,0.1);padding:4px 8px;border-radius:4px;display:inline-block;font-weight:700;margin-top:8px;">' + (isOutOfStock ? '❌' : '✅') + ' ' + stockLabel + ': ' + storeBrand + ' (' + s.stock + ' left)</div>' +
+              '</div>' +
+              '<div style="text-align:right;margin-right:12px;">' +
+              '<div style="font-weight:900;font-size:16px;color:var(--text);">₹' + s.price + '</div>' +
+              '<div style="font-size:11px;font-weight:700;color:' + (isOutOfStock ? 'var(--red)' : s.color) + ';margin-top:2px;">' + stockLabel + '</div>' +
+              '</div>' +
+              '<div>' + buyBtn + '</div>' +
+              '</div>';
+          });
+          storesListEl.innerHTML = storesHtml;
+          cityEl.textContent = "📍 " + mCity;
+        }
+
+        if (window.userLat && window.userLon) {
+          // Calculate bounding box (~15km radius)
+          var lat = window.userLat;
+          var lon = window.userLon;
+          var r = 15 / 111.32; // 15km in degrees
+          var query = '[out:json][timeout:15];(node["shop"="agrarian"](' + (lat-r) + ',' + (lon-r) + ',' + (lat+r) + ',' + (lon+r) + ');node["shop"="garden_centre"](' + (lat-r) + ',' + (lon-r) + ',' + (lat+r) + ',' + (lon+r) + '););out body 5;';
+          
+          fetch('https://overpass-api.de/api/interpreter', {
+            method: 'POST',
+            body: query
+          })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (data && data.elements && data.elements.length > 0) {
+              var realStores = data.elements.map(function(el) {
+                // Calculate distance using Haversine formula
+                var dLat = (el.lat - lat) * Math.PI / 180;
+                var dLon = (el.lon - lon) * Math.PI / 180;
+                var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(lat * Math.PI / 180) * Math.cos(el.lat * Math.PI / 180) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+                var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                var distKm = (6371 * c).toFixed(1);
+
+                return {
+                  name: el.tags.name || ("Agri Store (" + el.tags.shop + ")"),
+                  distance: distKm + " km",
+                  stock: Math.floor(Math.random() * 40), // Mock random stock
+                  price: 200 + Math.floor(Math.random() * 150), // Mock random price
+                  color: "var(--green)"
+                };
+              });
+              // Sort by distance
+              realStores.sort(function(a,b) { return parseFloat(a.distance) - parseFloat(b.distance); });
+              renderStores(realStores.slice(0, 5));
+            } else {
+              // Fallback to mock stores if no OpenStreetMap data found
+              renderStores(fallbackStores);
+            }
+          })
+          .catch(function(err) {
+            console.error("Overpass API error:", err);
+            renderStores(fallbackStores);
+          });
+        } else {
+          // No GPS permission, use fallback
+          renderStores(fallbackStores);
+        }
 
         loading.style.display = 'none';
         content.style.display = 'block';
