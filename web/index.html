@@ -3685,15 +3685,28 @@
         loading.style.display = 'none';
         p.textContent = 'AI is analyzing your crop...'; // reset
 
+        var boarDetected = true; // Enabled for MVP demo sync
+
         var statHtml = '<div style="display:flex; justify-content:space-between; margin-top:12px; font-size:12px; font-weight:700;">' +
           '<div style="display:flex;align-items:center;color:var(--green);"><span style="display:inline-block;width:10px;height:10px;background:rgba(16,185,129,0.7);border-radius:2px;margin-right:4px;"></span>High Vigor</div>' +
           '<div style="display:flex;align-items:center;color:var(--yellow);"><span style="display:inline-block;width:10px;height:10px;background:rgba(245,158,11,0.7);border-radius:2px;margin-right:4px;"></span>Stress</div>' +
           '<div style="display:flex;align-items:center;color:var(--red);"><span style="display:inline-block;width:10px;height:10px;background:rgba(239,68,68,0.7);border-radius:2px;margin-right:4px;"></span>Low Vigor</div>' +
           '</div>';
 
+        var boarAlertHtml = '';
+        if (boarDetected) {
+          boarAlertHtml = '<div style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:12px; padding:12px; margin-top:16px; display:flex; align-items:center; gap:12px;">' +
+            '<div style="font-size:24px; animation: pulseRed 2s infinite;">🐗</div>' +
+            '<div style="flex:1;">' +
+            '<div style="font-weight:800;font-size:14px;color:var(--red);">Thermal Wildlife Detection</div>' +
+            '<div style="font-size:12px;color:var(--text);margin-top:2px;">Large mammal (Likely Wild Boar) detected via thermal satellite signature. Synced to community alerts.</div>' +
+            '</div></div>';
+        }
+
         results.innerHTML = '<div class="result-card" style="border:1px solid var(--border); margin-top:16px;">' +
           '<h3 style="margin-bottom:8px;color:var(--text);font-size:18px;">🛰️ Satellite NDVI Results</h3>' +
           '<p style="font-size:13px;color:var(--muted);line-height:1.5;">12% of the Northern field shows severe nutrient stress.</p>' +
+          boarAlertHtml +
           '<div style="position:relative;">' +
           '<div id="satellite-map" style="height:250px; border-radius:12px; margin-top:16px; border:1px solid #cbd5e1; z-index:1;"></div>' +
           '<button onclick="if(satelliteMap){satelliteMap.setView((window.userLat && window.userLon) ? [window.userLat, window.userLon] : [18.5204, 73.8567], 19);}" style="position:absolute; bottom:10px; right:10px; z-index:1000; background:#fff; border:none; border-radius:50%; width:36px; height:36px; box-shadow:0 2px 6px rgba(0,0,0,0.3); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Locate Me">🎯</button>' +
@@ -3743,6 +3756,26 @@
           var rand = Math.random();
           var color = rand > 0.8 ? '#EF4444' : rand > 0.6 ? '#F59E0B' : '#10B981';
           L.polygon(patchBounds, { color: color, weight: 0, fillColor: color, fillOpacity: 0.6 }).addTo(satelliteMap);
+        }
+
+        if (boarDetected) {
+          var boarLat = farmCenter[0] + (Math.random() * 2 - 1) * offset * 0.8;
+          var boarLng = farmCenter[1] + (Math.random() * 2 - 1) * offset * 0.8;
+          
+          var pulsingIcon = L.divIcon({
+            className: 'pulsing-boar-icon',
+            html: '<div style="width:24px;height:24px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;box-shadow:0 0 0 0 rgba(239,68,68, 1);animation:pulseRed 2s infinite;">🐗</div>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
+          
+          L.marker([boarLat, boarLng], {icon: pulsingIcon}).addTo(satelliteMap)
+            .bindPopup('<b style="color:var(--red);font-size:14px;">Thermal Signature Detected</b><br><span style="font-size:12px;color:var(--muted)">Matches profile of Wild Boar (Suar)</span>').openPopup();
+
+          // Auto-broadcast to the community dashboard feed
+          if (window.reportWildlife) {
+            window.reportWildlife('Thermal Satellite Auto-Detect', true);
+          }
         }
 
       }, 4000);
@@ -4081,14 +4114,16 @@
       document.getElementById('passport-modal').style.display = 'flex';
     }
 
-    function reportWildlife() {
-      window.toast('🚨 Threat broadcasted to farmers within 5km!', 'error');
+    function reportWildlife(source, isAuto) {
+      if(!isAuto) window.toast('🚨 Threat broadcasted to farmers within 5km!', 'error');
+      
+      var reporter = source || 'You';
       // Append a simulated report block
       var feed = document.getElementById('wildlife-alerts-feed');
       if(feed) {
         var newAlert = document.createElement('div');
         newAlert.style.cssText = 'background:#fef2f2;border:1px solid #fecaca;padding:12px 16px;border-radius:10px;display:flex;align-items:center;gap:12px;animation:slideInRight 0.3s ease-out;';
-        newAlert.innerHTML = '<div style="font-size:24px;">🐗</div><div style="flex:1;"><div style="font-weight:700;font-size:14px;color:var(--text);">Wild Boar (Suar)</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">Reported by You • Just now</div></div><div style="font-size:11px;font-weight:700;color:var(--red);">LIVE</div>';
+        newAlert.innerHTML = '<div style="font-size:24px;">🐗</div><div style="flex:1;"><div style="font-weight:700;font-size:14px;color:var(--text);">Wild Boar (Suar)</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">Reported by ' + reporter + ' • Just now</div></div><div style="font-size:11px;font-weight:700;color:var(--red);">LIVE</div>';
         feed.insertBefore(newAlert, feed.firstChild);
       }
     }
