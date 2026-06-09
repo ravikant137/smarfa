@@ -854,6 +854,54 @@
           </div>
         </div>
 
+        <!-- Predictive Pest Radar -->
+        <div style="background:#fff; border-radius:16px; padding:20px; border:1px solid var(--border); box-shadow:0 2px 12px rgba(0,0,0,0.05); margin-bottom:24px; position:relative; overflow:hidden;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; position:relative; z-index:2;">
+            <div style="font-weight:800; font-size:18px; color:var(--text); display:flex; align-items:center; gap:8px;">
+              <span>📡</span> <span>Predictive Pest Radar</span>
+            </div>
+            <div style="font-size:11px; background:rgba(239,68,68,0.1); color:var(--red); padding:4px 10px; border-radius:50px; font-weight:700;">LIVE SCANNING</div>
+          </div>
+          
+          <div style="display:flex; gap:20px; position:relative; z-index:2; flex-wrap:wrap;">
+            <!-- Radar Visual -->
+            <div style="width:120px; height:120px; border-radius:50%; background:var(--surface); border:2px solid var(--green); position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+              <!-- Concentric circles -->
+              <div style="position:absolute; width:80px; height:80px; border-radius:50%; border:1px dashed rgba(61,122,58,0.3);"></div>
+              <div style="position:absolute; width:40px; height:40px; border-radius:50%; border:1px dashed rgba(61,122,58,0.3);"></div>
+              <div style="position:absolute; width:4px; height:4px; border-radius:50%; background:var(--green); z-index:5;"></div>
+              
+              <!-- Radar Sweep Animation -->
+              <div style="position:absolute; width:50%; height:50%; top:0; right:0; transform-origin:bottom left; background:linear-gradient(45deg, rgba(61,122,58,0.4) 0%, transparent 100%); animation:radarSweep 4s infinite linear;"></div>
+              
+              <style>
+                @keyframes radarSweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+              </style>
+
+              <!-- Blips -->
+              <div style="position:absolute; width:8px; height:8px; background:var(--red); border-radius:50%; top:25px; right:20px; box-shadow:0 0 8px var(--red); animation:blip 4s infinite;"></div>
+              <style>
+                @keyframes blip { 0%, 100% { opacity:0; } 50% { opacity:1; } }
+              </style>
+            </div>
+
+            <!-- Alerts -->
+            <div style="flex:1; min-width:280px;">
+              <p style="font-size:13px; color:var(--muted); margin-bottom:12px;">Monitoring regional wind patterns and community disease reports.</p>
+              
+              <div style="background:rgba(239,68,68,0.05); border-left:3px solid var(--red); padding:10px 14px; border-radius:4px; font-size:13px; margin-bottom:8px;">
+                <strong style="color:var(--red);">🚨 Fall Armyworm Swarm</strong><br>
+                <span style="color:var(--text);">Detected 42km East. Winds are blowing West at 12km/h. Expected arrival in 48-72 hours.</span>
+              </div>
+              
+              <div style="background:rgba(245,158,11,0.05); border-left:3px solid var(--yellow); padding:10px 14px; border-radius:4px; font-size:13px;">
+                <strong style="color:var(--yellow);">⚠️ Whitefly Activity</strong><br>
+                <span style="color:var(--text);">Elevated activity reported by 3 farms within a 15km radius.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Main Row: Map + Sidebar -->
         <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;margin-bottom:24px;">
 
@@ -902,9 +950,14 @@
                   <div style="font-size:13px;font-weight:700;" id="field-detail-planted">—</div>
                 </div>
               </div>
-              <button onclick="switchTab('scan')"
-                style="width:100%;background:var(--green);color:#fff;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:6px;">📷
-                Scan This Field Now</button>
+              <div style="display:flex; gap:10px; margin-top:12px;">
+                <button onclick="switchTab('scan')"
+                  style="flex:1;background:var(--green);color:#fff;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">📷
+                  Scan</button>
+                <button onclick="showPassport()"
+                  style="flex:1;background:#fff;color:#1e3a8a;border:1px solid #1e3a8a;padding:10px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">🔗
+                  Passport</button>
+              </div>
             </div>
           </div>
 
@@ -3734,6 +3787,47 @@
       console.log('PWA was installed');
     });
   </script>
+  <!-- Crop Passport Modal -->
+  <div id="passport-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; width:100%; max-width:400px; border-radius:24px; padding:32px; position:relative; box-shadow:0 24px 50px rgba(0,0,0,0.2); animation:slideUp 0.3s ease-out;">
+      <button onclick="document.getElementById('passport-modal').style.display='none'" style="position:absolute; top:20px; right:20px; background:var(--surface); border:none; width:36px; height:36px; border-radius:50%; font-size:16px; cursor:pointer; color:var(--text);">✕</button>
+      
+      <div style="text-align:center; margin-bottom:24px;">
+        <div style="font-size:48px; margin-bottom:12px;">🔗</div>
+        <h2 style="font-size:24px; font-weight:900; color:#1e3a8a;">Crop Passport</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:4px;">Verified Premium Quality Traceability</p>
+      </div>
+      
+      <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:16px; padding:20px; text-align:center; margin-bottom:24px;">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Smarfa-Crop-Passport-Valid" alt="QR Code" style="width:150px; height:150px; margin:0 auto 16px; border-radius:8px;">
+        <div style="font-size:11px; color:var(--muted); font-family:monospace;">HASH: 0x8F9A...B3C2</div>
+      </div>
+      
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:var(--text);">
+          <div style="width:24px; height:24px; background:rgba(16,185,129,0.1); color:var(--green); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">✓</div>
+          <div><strong>100% Organic Verified</strong><br><span style="color:var(--muted); font-size:11px;">No synthetic chemicals in logs</span></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:var(--text);">
+          <div style="width:24px; height:24px; background:rgba(59,130,246,0.1); color:var(--sky); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">💧</div>
+          <div><strong>Water Efficient</strong><br><span style="color:var(--muted); font-size:11px;">Saved 40% water using AI Irrigation</span></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:var(--text);">
+          <div style="width:24px; height:24px; background:rgba(245,158,11,0.1); color:var(--yellow); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">🛰️</div>
+          <div><strong>NDVI Inspected</strong><br><span style="color:var(--muted); font-size:11px;">Avg Health Score: 0.72</span></div>
+        </div>
+      </div>
+      
+      <button onclick="window.toast('Passport link copied to clipboard!', 'success')" style="width:100%; margin-top:24px; background:#1e3a8a; color:#fff; border:none; padding:14px; border-radius:50px; font-weight:700; cursor:pointer; font-size:14px;">Copy Public Link to Share</button>
+    </div>
+  </div>
+
+  <script>
+    function showPassport() {
+      document.getElementById('passport-modal').style.display = 'flex';
+    }
+  </script>
+
 </body>
 
 </html>
