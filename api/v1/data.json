@@ -1,0 +1,29 @@
+{
+  "inventory": [
+    {
+      "id": "store_1",
+      "name": "Kisan Agro Hub",
+      "distance": "1.2 km",
+      "stock": 15,
+      "price": 250,
+      "color": "#10b981"
+    },
+    {
+      "id": "store_2",
+      "name": "Green Field Fertilizers",
+      "distance": "3.4 km",
+      "stock": 3,
+      "price": 280,
+      "color": "#eab308"
+    },
+    {
+      "id": "store_3",
+      "name": "Ravi Krushi Kendra",
+      "distance": "5.1 km",
+      "stock": 50,
+      "price": 240,
+      "color": "#10b981"
+    }
+  ],
+  "orders": []
+}
