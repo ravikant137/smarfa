@@ -2373,42 +2373,33 @@
         var brandSubtitle = (aiProduct && aiProduct.commercial_name) ? aiProduct.commercial_name : activeIngredient;
         if (brandSubtitle && brandSubtitle.toLowerCase() === finalDisplayName.toLowerCase()) brandSubtitle = '';
 
-        // ── REAL COMMERCIAL PRODUCT CATALOG ──
-        var marketCatalog = {
-          "spinosad": { name: "Katyayani Spinosad 2.5% SC", image: "https://m.media-amazon.com/images/I/51r+hXo1RJL._SX679_.jpg", company: "Katyayani Organics", price: "₹450" },
-          "copper": { name: "Blitox 50W Copper Fungicide", image: "https://m.media-amazon.com/images/I/61WfQk5yJQL._SX679_.jpg", company: "Tata Rallis", price: "₹380" },
-          "neem": { name: "Plantic Organic Neem Oil", image: "https://m.media-amazon.com/images/I/61r5tS0k1JL._SX679_.jpg", company: "Plantic", price: "₹299" },
-          "imidacloprid": { name: "Confidor Imidacloprid", image: "https://m.media-amazon.com/images/I/51T9w9w9pQL._SX679_.jpg", company: "Bayer CropScience", price: "₹520" },
-          "mancozeb": { name: "UPL Indofil M-45 Mancozeb", image: "https://m.media-amazon.com/images/I/71uVv8QOIfL._SX679_.jpg", company: "UPL Ltd", price: "₹310" },
-          "chlorothalonil": { name: "Syngenta Daconil 2787 Fungicide", image: "https://m.media-amazon.com/images/I/41-b0K0P0jL.jpg", company: "Syngenta", price: "₹850" },
-          "trichoderma": { name: "Sanjeevni Trichoderma Viride", image: "https://m.media-amazon.com/images/I/61k2a03rG6L._SX679_.jpg", company: "Katyayani", price: "₹180" },
-          "azoxystrobin": { name: "Amistar Azoxystrobin 23% SC", image: "https://m.media-amazon.com/images/I/51wY84a-mBL._SX679_.jpg", company: "Syngenta", price: "₹1200" }
-        };
-
-        var catalogEntry = null;
-        var searchTarget = finalDisplayName.toLowerCase();
-        Object.keys(marketCatalog).forEach(function(k) {
-          if (searchTarget.includes(k)) catalogEntry = marketCatalog[k];
-        });
-
-        if (catalogEntry) {
-          finalDisplayName = catalogEntry.name;
-          brandSubtitle = "Manufacturer: " + catalogEntry.company;
-        }
-
         document.getElementById('market-disease-name').textContent = (lastScan.structured && lastScan.structured.disease_name) ? lastScan.structured.disease_name : "Crop Anomaly";
         document.getElementById('market-product-name').textContent = finalDisplayName;
         document.getElementById('market-product-desc').textContent = (brandSubtitle ? brandSubtitle + ' · ' : '') + (lastScan.structured && lastScan.structured.treatment && lastScan.structured.treatment.dosage ? lastScan.structured.treatment.dosage + ' · ' : '') + (treatmentType === 'organic' ? 'Organic' : 'Chemical') + ' Treatment';
         
         var imgContainer = document.getElementById('market-treatment-card').children[0];
-        
-        // AI Image Generation fallback if product is not in our real catalog
-        var aiImagePrompt = encodeURIComponent('A professional product photo of an agricultural bottle labeled "' + finalDisplayName + '", pesticide chemical, clean white background, high quality');
-        var aiFallback = 'https://image.pollinations.ai/prompt/' + aiImagePrompt + '?nologo=true&width=400&height=400';
-        var safeFallback = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZmFmYyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iI2NidDU1ZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+SijwvdGV4dD48dGV4dCB4PSI1MCUiIHk9Ijc1JSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5NGEzYjgiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFncmljdWx0dXJhbCBQcm9kdWN0PC90ZXh0Pjwvc3ZnPg==';
-        
-        var productImgUrl = catalogEntry ? catalogEntry.image : aiFallback;
-        imgContainer.innerHTML = '<img src="' + productImgUrl + '" alt="' + finalDisplayName + '" onerror="this.onerror=null; this.src=\'' + safeFallback + '\';" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:8px;background:#f8fafc;">';
+        imgContainer.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><div class="spinner"></div></div>';
+
+        // Fetch from the new dedicated separate backend API
+        var apiUrl = (window.APP && window.APP.API) ? window.APP.API : (window.location.origin.startsWith('http') ? window.location.origin : '');
+        fetch(apiUrl + '/api/v1/market?query=' + encodeURIComponent(finalDisplayName) + '&treatment=' + encodeURIComponent(activeIngredient))
+          .then(function(res) { return res.json(); })
+          .then(function(json) {
+            if (json.success && json.data) {
+              var p = json.data;
+              document.getElementById('market-product-name').textContent = p.name;
+              var newSubtitle = (p.company && p.company !== "Generic Brand") ? "Manufacturer: " + p.company : brandSubtitle;
+              document.getElementById('market-product-desc').textContent = (newSubtitle ? newSubtitle + ' · ' : '') + (lastScan.structured && lastScan.structured.treatment && lastScan.structured.treatment.dosage ? lastScan.structured.treatment.dosage + ' · ' : '') + (treatmentType === 'organic' ? 'Organic' : 'Chemical') + ' Treatment';
+              
+              var safeFallback = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZmFmYyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iI2NidDU1ZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+SijwvdGV4dD48dGV4dCB4PSI1MCUiIHk9Ijc1JSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5NGEzYjgiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFncmljdWx0dXJhbCBQcm9kdWN0PC90ZXh0Pjwvc3ZnPg==';
+              imgContainer.innerHTML = '<img src="' + p.image + '" alt="' + p.name + '" onerror="this.onerror=null; this.src=\'' + safeFallback + '\';" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:8px;background:#f8fafc;">';
+            }
+          })
+          .catch(function(err) {
+            console.error("Market API error:", err);
+            var safeFallback = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZmFmYyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iI2NidDU1ZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+SijwvdGV4dD48dGV4dCB4PSI1MCUiIHk9Ijc1JSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5NGEzYjgiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFncmljdWx0dXJhbCBQcm9kdWN0PC90ZXh0Pjwvc3ZnPg==';
+            imgContainer.innerHTML = '<img src="' + safeFallback + '" alt="Fallback" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:8px;background:#f8fafc;">';
+          });
 
         imgContainer.style.overflow = 'hidden';
         imgContainer.style.padding = '0';
