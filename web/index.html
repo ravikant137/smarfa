@@ -2386,8 +2386,9 @@
         };
 
         var catalogEntry = null;
+        var searchTarget = (finalDisplayName + ' ' + activeIngredient).toLowerCase();
         Object.keys(marketCatalog).forEach(function(k) {
-          if (finalDisplayName.toLowerCase().includes(k)) catalogEntry = marketCatalog[k];
+          if (searchTarget.includes(k)) catalogEntry = marketCatalog[k];
         });
 
         if (catalogEntry) {
