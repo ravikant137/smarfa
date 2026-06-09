@@ -1,4 +1,4 @@
-const https = require('https');
+import https from 'https';
 
 function fetchOverpass(lat, lon) {
   return new Promise((resolve, reject) => {
@@ -45,7 +45,7 @@ function haversine(lat1, lon1, lat2, lon2) {
   return (6371 * c).toFixed(1);
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -81,4 +81,4 @@ module.exports = async (req, res) => {
     // If Overpass rate-limits or fails, return empty to not crash the frontend
     return res.status(200).json({ success: true, data: [] });
   }
-};
+}
