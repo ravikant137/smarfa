@@ -2292,16 +2292,14 @@
         var treatmentName = extractIngredient(rawChemical || rawOrganic || lastScan.treatment_recommendation || 'AI Treatment');
         var aiProduct = lastScan.structured && lastScan.structured.product;
         var activeIngredient = extractIngredient((aiProduct && aiProduct.active_ingredient) || '');
-        var displayProductName = (aiProduct && aiProduct.commercial_name) || activeIngredient || treatmentName;
-        var aiImgUrl = '';
+        
+        // Prioritize the actual chemical/organic treatment name over a generic commercial name
+        var finalDisplayName = treatmentName || activeIngredient || (aiProduct && aiProduct.commercial_name) || 'AI Treatment';
+        var brandSubtitle = (aiProduct && aiProduct.commercial_name) ? aiProduct.commercial_name : activeIngredient;
+        if (brandSubtitle.toLowerCase() === finalDisplayName.toLowerCase()) brandSubtitle = '';
 
-        // ── Purely LLM-driven: no hardcoded catalog ──
-        var finalDisplayName = (aiProduct && aiProduct.commercial_name) || activeIngredient || treatmentName || 'AI Treatment';
-        var brandSubtitle = activeIngredient && activeIngredient.toLowerCase() !== finalDisplayName.toLowerCase() ? activeIngredient : '';
-
-        // Dynamic image: construct Wikimedia Commons URL from ingredient name
-        var wikiSlug = (activeIngredient || treatmentName || '').trim().replace(/\s+/g, '_');
-        var productImgUrl = wikiSlug ? 'https://en.wikipedia.org/wiki/Special:FilePath/' + encodeURIComponent(wikiSlug) + '.svg' : '';
+        // Dynamic image: Use a reliable fallback for pesticides/treatments
+        var productImgUrl = 'https://images.unsplash.com/photo-1628183212861-c8fc4ab58153?w=200&h=200&fit=crop&q=80';
         var genericFallback = 'https://images.unsplash.com/photo-1585566369773-da34a6e6e67a?w=200&h=200&fit=crop&q=80';
 
         document.getElementById('market-disease-name').textContent = (lastScan.structured && lastScan.structured.disease_name) ? lastScan.structured.disease_name : "Crop Anomaly";
