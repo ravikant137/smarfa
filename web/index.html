@@ -4131,22 +4131,20 @@
         feed.insertBefore(newAlert, feed.firstChild);
       }
 
-      // Append to the global Alerts tab
-      var globalAlerts = document.getElementById('alerts-list');
-      if(globalAlerts) {
-        var loading = globalAlerts.querySelector('.loading-overlay');
-        if (loading) loading.style.display = 'none';
-        
-        var globalAlertItem = document.createElement('div');
-        globalAlertItem.className = 'alert-item critical';
-        globalAlertItem.innerHTML = '<div class="alert-icon" style="font-size:20px;">🚨</div>' +
-                                    '<div class="alert-content">' +
-                                      '<h3>Wildlife Threat Detected</h3>' +
-                                      '<p>A Wild Boar (Suar) has been spotted nearby by ' + reporter + '. Please secure your fields.</p>' +
-                                      '<span class="alert-time">Just now</span>' +
-                                    '</div>';
-        globalAlerts.insertBefore(globalAlertItem, globalAlerts.firstChild);
-        
+      // Persist to local history so it survives tab switching
+      var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+      history.unshift({
+        timestamp: Date.now(),
+        severity: 'critical',
+        crop_detected: 'Wildlife Threat: Wild Boar',
+        health_assessment: 'A Wild Boar (Suar) has been spotted nearby by ' + reporter + '. Please secure your fields.'
+      });
+      localStorage.setItem('scanHistory', JSON.stringify(history));
+
+      // Refresh global alerts list if we are currently on that tab
+      if (document.getElementById('tab-alerts').classList.contains('active')) {
+         if (window.loadAlerts) window.loadAlerts();
+      } else {
         // Add red notification dot to the Alerts tab icon in nav
         var alertsNavBtn = document.querySelector('nav .nav-item[onclick="switchTab(\\\'alerts\\\')"]');
         if (alertsNavBtn && !alertsNavBtn.querySelector('.notif-dot')) {
