@@ -30,25 +30,8 @@ export default async function handler(req, res) {
     }
   }
 
-  // Helper function to proxy an image URL to a pure Base64 string
-  const fetchAsBase64 = async (url) => {
-    try {
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }});
-      if (res.ok) {
-        const arrayBuffer = await res.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const ct = res.headers.get('content-type') || 'image/jpeg';
-        return `data:${ct.split(';')[0]};base64,${buffer.toString('base64')}`;
-      }
-    } catch (e) { console.error('Image proxy error:', e); }
-    return null;
-  };
-
   if (matchedProduct) {
-    const base64Img = await fetchAsBase64(matchedProduct.image);
-    if (base64Img) {
-      return res.status(200).json({ success: true, data: { ...matchedProduct, image: base64Img }});
-    }
+    return res.status(200).json({ success: true, data: matchedProduct });
   }
 
   // 2. Dynamic Yahoo Web Scraper Fallback
@@ -59,10 +42,7 @@ export default async function handler(req, res) {
       const html = await searchRes.text();
       const match = html.match(/src=["'](https:\/\/tse[0-9]\.mm\.bing\.net[^"']+)["']/);
       if (match && match[1]) {
-        const base64Img = await fetchAsBase64(match[1]);
-        if (base64Img) {
-          return res.status(200).json({ success: true, data: { name: displayName, image: base64Img, company: "Verified Web Result", price: "Check Local Store", isWebScraped: true }});
-        }
+        return res.status(200).json({ success: true, data: { name: displayName, image: match[1], company: "Verified Web Result", price: "Check Local Store", isWebScraped: true }});
       }
     }
   } catch (error) { console.error("Web scraper error:", error); }
