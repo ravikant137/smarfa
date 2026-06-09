@@ -2094,7 +2094,7 @@
           resolve(hash);
         };
         img.onerror = () => resolve(null);
-        img.src = base64;
+        img.src = base64.startsWith('data:') ? base64 : 'data:image/jpeg;base64,' + base64;
       });
     }
 
