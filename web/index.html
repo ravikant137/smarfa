@@ -1277,9 +1277,12 @@
 
             <div id="market-treatment-card"
               style="background:#fff;border-radius:16px;padding:24px;border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,0.06);display:flex;gap:24px;align-items:flex-start;">
-              <div
-                style="width:120px;height:120px;background:#f8fafc;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:48px;border:1px solid #e2e8f0;">
-                💊</div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div id="market-image-container"
+                  style="width:120px;height:120px;background:#f8fafc;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:48px;border:1px solid #e2e8f0;overflow:hidden;">
+                  💊</div>
+                <a id="market-google-link" href="#" target="_blank" style="display:none; text-align:center; font-size:11px; background:#e2e8f0; color:#334155; padding:6px; border-radius:6px; font-weight:700; text-decoration:none;">View Real Photos</a>
+              </div>
               <div style="flex:1;">
                 <div
                   style="font-size:12px;color:var(--green);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
@@ -2391,8 +2394,10 @@
         document.getElementById('market-product-name').textContent = finalDisplayName;
         document.getElementById('market-product-desc').textContent = (brandSubtitle ? brandSubtitle + ' · ' : '') + (lastScan.structured && lastScan.structured.treatment && lastScan.structured.treatment.dosage ? lastScan.structured.treatment.dosage + ' · ' : '') + (treatmentType === 'organic' ? 'Organic' : 'Chemical') + ' Treatment';
         
-        var imgContainer = document.getElementById('market-treatment-card').children[0];
+        var imgContainer = document.getElementById('market-image-container');
+        var googleLink = document.getElementById('market-google-link');
         imgContainer.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><div class="spinner"></div></div>';
+        googleLink.style.display = 'none';
 
         // Fetch from the new dedicated separate backend API
         var apiUrl = typeof API !== 'undefined' ? API : (window.location.origin.startsWith('http') ? window.location.origin : 'http://192.168.29.181:8000');
@@ -2406,17 +2411,17 @@
               document.getElementById('market-product-desc').textContent = (newSubtitle ? newSubtitle + ' · ' : '') + (lastScan.structured && lastScan.structured.treatment && lastScan.structured.treatment.dosage ? lastScan.structured.treatment.dosage + ' · ' : '') + (treatmentType === 'organic' ? 'Organic' : 'Chemical') + ' Treatment';
               
               var safeFallback = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZmFmYyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iI2NidDU1ZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+SijwvdGV4dD48dGV4dCB4PSI1MCUiIHk9Ijc1JSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5NGEzYjgiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFncmljdWx0dXJhbCBQcm9kdWN0PC90ZXh0Pjwvc3ZnPg==';
-              imgContainer.innerHTML = '<img src="' + p.image + '" alt="' + p.name + '" onerror="this.onerror=null; this.src=\'' + safeFallback + '\';" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:8px;background:#f8fafc;">';
+              imgContainer.innerHTML = '<img src="' + p.image + '" alt="' + p.name + '" onerror="this.onerror=null; this.src=\'' + safeFallback + '\';" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:0;background:#f8fafc;">';
+              
+              googleLink.href = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(p.name + ' pesticide product');
+              googleLink.style.display = 'block';
             }
           })
           .catch(function(err) {
             console.error("Market API error:", err);
             var safeFallback = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZmFmYyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iI2NidDU1ZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+SijwvdGV4dD48dGV4dCB4PSI1MCUiIHk9Ijc1JSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5NGEzYjgiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFncmljdWx0dXJhbCBQcm9kdWN0PC90ZXh0Pjwvc3ZnPg==';
-            imgContainer.innerHTML = '<img src="' + safeFallback + '" alt="Fallback" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:8px;background:#f8fafc;">';
+            imgContainer.innerHTML = '<img src="' + safeFallback + '" alt="Fallback" style="width:100%;height:100%;object-fit:contain;border-radius:12px;padding:0;background:#f8fafc;">';
           });
-
-        imgContainer.style.overflow = 'hidden';
-        imgContainer.style.padding = '0';
 
         // ── Nearby Stores (Local) ──
         var stores = [
