@@ -39,20 +39,32 @@ export default async function handler(req, res) {
   // 2. Direct Bing Thumbnail API (Unblockable & Real Photos)
   // Instead of scraping on the backend (which gets blocked), we provide a direct 
   // Bing Thumbnail API link that the user's browser can fetch safely via CORS.
-  const bingThumb = `https://tse1.mm.bing.net/th?q=${encodeURIComponent(finalName + ' pesticide bottle')}&w=400&h=400&c=7&rs=1&p=0&dpr=2&pid=1.7`;
+  const bingThumb = `https://tse1.mm.bing.net/th?q=${encodeURIComponent(finalName + ' pesticide bottle real photo')}&w=400&h=400&c=7&rs=1&p=0&dpr=2&pid=1.7`;
 
-  return res.status(200).json({ 
-    success: true, 
-    data: { 
-      name: finalName, 
-      image: bingThumb, 
-      company: company, 
-      price: price, 
-      isWebScraped: true 
-    }
-  });
+  try {
+    // 3. Server-Side Image Proxying
+    // Fetch the real photo on the backend and return it as a base64 string
+    // This completely bypasses all client-side CORS restrictions and ad/tracker blockers
+    const imgRes = await fetch(bingThumb);
+    if (!imgRes.ok) throw new Error('Image fetch failed');
+    const arrayBuffer = await imgRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64Image = `data:image/jpeg;base64,${buffer.toString('base64')}`;
 
-  // 3. Absolute Fallback (Pure SVG)
-  const safeFallback = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZmFmYyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iI2NidDU1ZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+SijwvdGV4dD48dGV4dCB4PSI1MCUiIHk9Ijc1JSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5NGEzYjgiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFncmljdWx0dXJhbCBQcm9kdWN0PC90ZXh0Pjwvc3ZnPg==';
-  return res.status(200).json({ success: true, data: { name: displayName, image: safeFallback, company: "Generic Brand", price: "-", isFallback: true }});
+    return res.status(200).json({ 
+      success: true, 
+      data: { 
+        name: finalName, 
+        image: base64Image, 
+        company: company, 
+        price: price, 
+        isWebScraped: true 
+      }
+    });
+  } catch (err) {
+    console.error('Market Proxy Error:', err.message);
+    // 4. Absolute Fallback (Pure SVG)
+    const safeFallback = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZmFmYyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iI2NidDU1ZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+SijwvdGV4dD48dGV4dCB4PSI1MCUiIHk9Ijc1JSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5NGEzYjgiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFncmljdWx0dXJhbCBQcm9kdWN0PC90ZXh0Pjwvc3ZnPg==';
+    return res.status(200).json({ success: true, data: { name: displayName, image: safeFallback, company: "Generic Brand", price: "-", isFallback: true }});
+  }
 }
