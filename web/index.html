@@ -3366,6 +3366,9 @@
           + '<div style="font-size:12px;font-weight:700;color:#2c2c1a;">' + crop + '</div>'
           + '<div style="font-size:10px;color:#7a6a52;margin-top:2px;">' + d.days + ' days</div>'
           + '</div>';
+      }).join('');
+    }
+
     function loadLifecycle(crop) {
       var el = document.getElementById('lifecycle-content');
       var d = CROP_DATA[crop];
@@ -3662,77 +3665,7 @@
       }).join('');
     }
 
-    // ── Regional Crop Suggestions ────────────────
-    var SEASON_CROPS = {
-      // India-focused seasonal recommendations
-      Kharif: {
-        months: [6, 7, 8, 9, 10], label: '🌧️ Kharif Season (Jun–Oct)',
-        crops: [
-          { name: 'Rice', icon: '🌾', reason: 'Loves monsoon rains', soil: 'Clay/Waterlogged', duration: '130 days' },
-          { name: 'Corn', icon: '🌽', reason: 'High yield in warm wet season', soil: 'Sandy Loam', duration: '100 days' },
-          { name: 'Soybean', icon: '🫘', reason: 'Nitrogen-fixing, rain-fed', soil: 'Loam', duration: '90 days' },
-          { name: 'Tomato', icon: '🍅', reason: 'Thrives in warm humid weather', soil: 'Well-drained', duration: '90 days' },
-          { name: 'Banana', icon: '🍌', reason: 'Tropical staple, high yield', soil: 'Rich Loam', duration: '300 days' }
-        ]
-      },
-      Rabi: {
-        months: [11, 0, 1, 2, 3], label: '❄️ Rabi Season (Nov–Mar)',
-        crops: [
-          { name: 'Wheat', icon: '🌾', reason: 'India\'s primary rabi crop', soil: 'Loamy/Clay', duration: '120 days' },
-          { name: 'Potato', icon: '🥔', reason: 'Cool weather staple', soil: 'Sandy Loam', duration: '90 days' },
-          { name: 'Citrus', icon: '🍊', reason: 'Winter citrus growth period', soil: 'Well-drained', duration: '365 days' },
-          { name: 'Pepper', icon: '🌶️', reason: 'Cool nights improve flavour', soil: 'Loam', duration: '80 days' },
-          { name: 'Sunflower', icon: '🌻', reason: 'Oil crop, frost-tolerant', soil: 'Sandy Loam', duration: '90 days' }
-        ]
-      },
-      Zaid: {
-        months: [4, 5], label: '☀️ Zaid Season (Apr–Jun)',
-        crops: [
-          { name: 'Mango', icon: '🥭', reason: 'Peak fruiting season', soil: 'Deep Alluvial', duration: '365 days' },
-          { name: 'Grape', icon: '🍇', reason: 'Harvest & post-harvest care', soil: 'Sandy Loam', duration: '180 days' },
-          { name: 'Corn', icon: '🌽', reason: 'Short-season summer variety', soil: 'Sandy Loam', duration: '80 days' },
-          { name: 'Apple', icon: '🍎', reason: 'Hill regions only (>1000m)', soil: 'Loam', duration: '150 days' }
-        ]
-      }
-    };
 
-    function getCurrentSeason() {
-      var m = new Date().getMonth();
-      if (SEASON_CROPS.Kharif.months.includes(m)) return 'Kharif';
-      if (SEASON_CROPS.Zaid.months.includes(m)) return 'Zaid';
-      return 'Rabi';
-    }
-
-    function renderRegionalCrops() {
-      var season = getCurrentSeason();
-      var data = SEASON_CROPS[season];
-      var badge = document.getElementById('lc-season-badge');
-      if (badge) badge.textContent = data.label;
-
-      // Update location badge
-      var locBadge = document.getElementById('lc-location-badge');
-      var lat = window.userLat, lon = window.userLon;
-      if (locBadge) {
-        if (lat && lon) {
-          locBadge.innerHTML = '📍 ' + lat.toFixed(2) + '°N, ' + lon.toFixed(2) + '°E · India';
-        } else {
-          locBadge.innerHTML = '📍 India · ' + season + ' Season';
-        }
-      }
-
-      var el = document.getElementById('regional-crops-grid');
-      if (!el) return;
-      el.innerHTML = data.crops.map(function (c) {
-        var isPlanted = Object.values(FIELDS).some(function (f) { return f.crop === c.name; });
-        return '<div onclick="loadLifecycle(\'' + c.name + '\')" style="background:#faf7f2;border-radius:14px;padding:16px;border:2px solid ' + (isPlanted ? '#3d7a3a' : '#e2e8f0') + ';cursor:pointer;transition:.2s;position:relative;" onmouseover="this.style.borderColor=\'#3d7a3a\'" onmouseout="this.style.borderColor=\'' + (isPlanted ? '#3d7a3a' : '#e2e8f0') + '\'">'
-          + (isPlanted ? '<div style="position:absolute;top:8px;right:8px;background:#3d7a3a;color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:50px;">IN YOUR FIELDS</div>' : '')
-          + '<div style="font-size:30px;margin-bottom:8px;">' + c.icon + '</div>'
-          + '<div style="font-weight:800;font-size:13px;margin-bottom:4px;">' + c.name + '</div>'
-          + '<div style="font-size:11px;color:#7a6a52;margin-bottom:6px;line-height:1.4;">' + c.reason + '</div>'
-          + '<div style="font-size:10px;background:rgba(61,122,58,0.1);color:#3d7a3a;padding:3px 8px;border-radius:50px;display:inline-block;font-weight:700;">' + c.duration + '</div>'
-          + '</div>';
-      }).join('');
-    }
 
     // Auto-refresh pump status every 30s
     setInterval(function () { if (currentUser) loadPumpStatus(); }, 30000);
