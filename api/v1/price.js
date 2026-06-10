@@ -46,9 +46,6 @@ export default async function handler(req, res) {
   const currentPrice = Math.round(basePrice + rand);
   const trend = rand >= 0 ? 'up' : 'down';
 
-  // Add a slight artificial delay to simulate network latency
-  await new Promise(resolve => setTimeout(resolve, 300));
-
   return res.status(200).json({
     success: true,
     data: {
