@@ -1509,21 +1509,22 @@
     }
 
     if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
+      navigator.geolocation.watchPosition(
         function (position) { setupLocation(position.coords.latitude, position.coords.longitude); },
         function (error) {
           // IP Fallback
-          fetch('http://ip-api.com/json/')
+          fetch('https://get.geojs.io/v1/ip/geo.json')
             .then(function(res){return res.json()})
-            .then(function(data){ if(data.lat && data.lon) setupLocation(data.lat, data.lon); })
+            .then(function(data){ if(data.latitude && data.longitude) setupLocation(parseFloat(data.latitude), parseFloat(data.longitude)); })
             .catch(function(e){});
-        }
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
       );
     } else {
       // IP Fallback
-      fetch('http://ip-api.com/json/')
+      fetch('https://get.geojs.io/v1/ip/geo.json')
         .then(function(res){return res.json()})
-        .then(function(data){ if(data.lat && data.lon) setupLocation(data.lat, data.lon); })
+        .then(function(data){ if(data.latitude && data.longitude) setupLocation(parseFloat(data.latitude), parseFloat(data.longitude)); })
         .catch(function(e){});
     }
 
