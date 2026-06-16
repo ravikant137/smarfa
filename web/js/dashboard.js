@@ -49,6 +49,8 @@
         maxZoom: 20, attribution: '© Google Earth Engine'
       }).addTo(window.dashMap);
 
+      setTimeout(() => { if (window.dashMap) window.dashMap.invalidateSize(); }, 300);
+
       // Initialize polygon drawing tool
       if (window.initSatelliteDrawing) window.initSatelliteDrawing(window.dashMap);
 
@@ -103,14 +105,18 @@
         .catch(() => loadMapAtLocation(15.3647, 75.1240));
     }
 
-    if (!navigator.geolocation) { fallbackToIP(); return; }
-
-    const timeout = setTimeout(() => { console.warn('GPS timeout, using IP'); fallbackToIP(); }, 4000);
-    navigator.geolocation.getCurrentPosition(
-      pos => { clearTimeout(timeout); loadMapAtLocation(pos.coords.latitude, pos.coords.longitude); },
-      () => { clearTimeout(timeout); fallbackToIP(); },
-      { enableHighAccuracy: true, timeout: 3500, maximumAge: 0 }
-    );
+    if (window.userLat && window.userLon) {
+      loadMapAtLocation(window.userLat, window.userLon);
+    } else if (!navigator.geolocation) { 
+      fallbackToIP(); 
+    } else {
+      const timeout = setTimeout(() => { console.warn('GPS timeout, using IP'); fallbackToIP(); }, 4000);
+      navigator.geolocation.getCurrentPosition(
+        pos => { clearTimeout(timeout); loadMapAtLocation(pos.coords.latitude, pos.coords.longitude); },
+        () => { clearTimeout(timeout); fallbackToIP(); },
+        { enableHighAccuracy: true, timeout: 3500, maximumAge: 0 }
+      );
+    }
   };
 
 })();

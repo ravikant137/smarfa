@@ -3923,6 +3923,7 @@
         var farmCenter = (window.userLat && window.userLon) ? [window.userLat, window.userLon] : [18.5204, 73.8567];
         var zoom = radiusMeters > 1500 ? 14 : radiusMeters > 800 ? 15 : radiusMeters > 300 ? 16 : 17;
         satelliteMap = L.map('satellite-map', { zoomControl: false }).setView(farmCenter, zoom);
+        setTimeout(() => { if (satelliteMap) satelliteMap.invalidateSize(); }, 300);
 
         L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
           maxZoom: 20,
