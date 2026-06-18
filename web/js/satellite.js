@@ -98,7 +98,7 @@
         fetch(`${API}/api/v1/agro?action=soil&polyid=${polyId}`).then(r => r.json()).catch(() => null),
         fetch(`${API}/api/v1/agro?action=precipitation&polyid=${polyId}`).then(r => r.json()).catch(() => [])
       ]).then(([images, ndviHistory, soil, precip]) => {
-        renderNDVI(map, outline, ndviHistory);
+        renderNDVI(map, outline, ndviHistory, images);
         renderSoilData(soil);
         renderRainOverlay(map, precip);
         updateFieldDetailPanel(images, ndviHistory, soil, precip);
@@ -132,7 +132,7 @@
     return 'Healthy Crop';
   }
 
-  function renderNDVI(map, outline, ndviHistory) {
+  function renderNDVI(map, outline, ndviHistory, images) {
     var ndviStats = null;
     if (ndviHistory && ndviHistory.length > 0) {
       ndviHistory.sort((a, b) => b.dt - a.dt);
@@ -143,7 +143,24 @@
     const max = ndviStats ? ndviStats.max : null;
     const color = ndviToColor(mean);
 
-    outline.setStyle({ fillColor: color, fillOpacity: 0.55, color: '#fff', weight: 2 });
+    // Render actual satellite imagery tiles if available
+    let hasTiles = false;
+    if (window._agroTileLayer) {
+      map.removeLayer(window._agroTileLayer);
+      window._agroTileLayer = null;
+    }
+    if (images && images.length > 0) {
+      images.sort((a, b) => b.dt - a.dt);
+      const latestImage = images[0];
+      if (latestImage.tile && latestImage.tile.ndvi) {
+        hasTiles = true;
+        window._agroTileLayer = L.tileLayer(latestImage.tile.ndvi, {
+          maxZoom: 22, maxNativeZoom: 19, attribution: 'AgroMonitoring NDVI'
+        }).addTo(map);
+      }
+    }
+
+    outline.setStyle({ fillColor: color, fillOpacity: hasTiles ? 0 : 0.55, color: '#fff', weight: 2 });
 
     if (ndviStats && max - min > 0.1) {
       const b = outline.getBounds();
