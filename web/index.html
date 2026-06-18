@@ -3925,7 +3925,8 @@
         setTimeout(() => { if (satelliteMap) satelliteMap.invalidateSize(); }, 300);
 
         L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-          maxZoom: 20,
+          maxZoom: 22,
+          maxNativeZoom: 19,
           attribution: 'Map data © Google'
         }).addTo(satelliteMap);
 

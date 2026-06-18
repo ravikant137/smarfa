@@ -48,7 +48,7 @@
       window.dashMap = L.map('farm-map').setView([lat, lon], 16);
 
       L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-        maxZoom: 20, attribution: '© Google Earth Engine'
+        maxZoom: 22, maxNativeZoom: 19, attribution: '© Google Earth Engine'
       }).addTo(window.dashMap);
 
       setTimeout(() => { if (window.dashMap) window.dashMap.invalidateSize(); }, 300);
