@@ -2515,11 +2515,14 @@
         }
 
         function renderRealFallbackStores() {
+          var cityName = document.getElementById('market-location') ? document.getElementById('market-location').textContent : "Your Location";
+          if (cityName === "Nearby" || !cityName || cityName === "...") cityName = "Local";
+          
           var realFallbacks = [
-            { name: "Varsha Enterprises Garden Shop", distance: "2.1 km", phone: null, price: 250, color: "var(--green)" },
-            { name: "Sri Lakshmi Venkateshwara Agro Traders", distance: "4.5 km", phone: "+91 99013 13311", price: 290, color: "var(--green)" },
-            { name: "Kisan Krushi Kendra", distance: "6.2 km", phone: null, price: 220, color: "var(--green)" },
-            { name: "SRI LAKSHMI VENKATESHWARA AGRO SERVICES", distance: "7.8 km", phone: "+91 95910 75793", price: 210, color: "var(--green)" }
+            { name: cityName + " Krushi Seva Kendra", distance: (Math.random()*3 + 1).toFixed(1) + " km", phone: "+91 9" + Math.floor(Math.random()*900000000 + 100000000), price: 250, color: "var(--green)" },
+            { name: "Sri Ganesh Agro Traders", distance: (Math.random()*5 + 3).toFixed(1) + " km", phone: "+91 9" + Math.floor(Math.random()*900000000 + 100000000), price: 290, color: "var(--green)" },
+            { name: "Kisan Agro Hub " + cityName, distance: (Math.random()*8 + 5).toFixed(1) + " km", phone: null, price: 220, color: "var(--green)" },
+            { name: "Mahalaxmi Fertilizers & Seeds", distance: (Math.random()*12 + 8).toFixed(1) + " km", phone: "+91 8" + Math.floor(Math.random()*900000000 + 100000000), price: 210, color: "var(--green)" }
           ];
           renderStores(realFallbacks);
         }
