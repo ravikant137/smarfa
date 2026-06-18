@@ -73,7 +73,9 @@
       }
     };
 
-    fetch(`${API}/api/v1/agro?action=register-polygon`, {
+    const APP_KEY = window.APP && window.APP.AGRO_API_KEY ? window.APP.AGRO_API_KEY : '8518d290ab4e6f4ca86ee6c7d841b3fb';
+
+    fetch(`https://api.agromonitoring.com/agro/1.0/polygons?appid=${APP_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(polygonData)
@@ -91,12 +93,13 @@
 
       const endUnix = Math.floor(Date.now() / 1000);
       const startUnix = endUnix - (90 * 24 * 60 * 60);
+      const startRainUnix = endUnix - (7 * 24 * 60 * 60); // 7 days for precipitation
 
       return Promise.all([
-        fetch(`${API}/api/v1/agro?action=image-search&polyid=${polyId}&start=${startUnix}&end=${endUnix}`).then(r => r.json()).catch(() => []),
-        fetch(`${API}/api/v1/agro?action=ndvi-history&polyid=${polyId}`).then(r => r.json()).catch(() => []),
-        fetch(`${API}/api/v1/agro?action=soil&polyid=${polyId}`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/v1/agro?action=precipitation&polyid=${polyId}`).then(r => r.json()).catch(() => [])
+        fetch(`https://api.agromonitoring.com/agro/1.0/image/search?start=${startUnix}&end=${endUnix}&polyid=${polyId}&appid=${APP_KEY}`).then(r => r.json()).catch(() => []),
+        fetch(`https://api.agromonitoring.com/agro/1.0/ndvi/history?polyid=${polyId}&appid=${APP_KEY}`).then(r => r.json()).catch(() => []),
+        fetch(`https://api.agromonitoring.com/agro/1.0/soil?polyid=${polyId}&appid=${APP_KEY}`).then(r => r.json()).catch(() => null),
+        fetch(`https://api.agromonitoring.com/agro/1.0/weather/history?polyid=${polyId}&start=${startRainUnix}&end=${endUnix}&appid=${APP_KEY}&units=metric`).then(r => r.json()).catch(() => [])
       ]).then(([images, ndviHistory, soil, precip]) => {
         renderNDVI(map, outline, ndviHistory, images);
         renderSoilData(soil);
