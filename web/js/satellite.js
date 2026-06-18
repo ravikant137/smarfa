@@ -29,17 +29,25 @@
         const latlngs = e.layer.getLatLngs()[0];
         window.currentPolygonCoordinates = latlngs.map(ll => [ll.lat, ll.lng]);
 
-        // Calculate real area from backend
-        fetch(`${API}/api/v1/field?action=calculate-area`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ coordinates: window.currentPolygonCoordinates })
-        }).then(r => r.json()).then(areaData => {
-          if (areaData.acres) {
-            const areaEl = document.getElementById('field-detail-area');
-            if (areaEl) areaEl.textContent = areaData.acres + ' acres (' + areaData.hectares + ' ha)';
+        // Calculate real area using pure JS (Haversine/Spherical Polygon)
+        const coords = window.currentPolygonCoordinates;
+        let areaSqMeters = 0;
+        if (coords.length > 2) {
+          const earthRadius = 6378137;
+          let area = 0;
+          for (let i = 0; i < coords.length; i++) {
+            let p1 = coords[i];
+            let p2 = coords[(i + 1) % coords.length];
+            area += (p2[1] - p1[1]) * Math.PI / 180 * (2 + Math.sin(p1[0] * Math.PI / 180) + Math.sin(p2[0] * Math.PI / 180));
           }
-        }).catch(() => {});
+          areaSqMeters = Math.abs(area * earthRadius * earthRadius / 2);
+        }
+
+        const hectares = (areaSqMeters / 10000).toFixed(2);
+        const acres = (areaSqMeters / 4046.86).toFixed(2);
+        
+        const areaEl = document.getElementById('field-detail-area');
+        if (areaEl) areaEl.textContent = acres + ' acres (' + hectares + ' ha)';
 
         const btn = document.getElementById('analyze-field-btn');
         if (btn) {
