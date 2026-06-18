@@ -114,10 +114,25 @@
     }
 
     function fallbackToIP() {
-      fetch('https://ipapi.co/json/')
+      let resolved = false;
+      const forceLoad = () => {
+        if (!resolved) {
+          resolved = true;
+          loadMapAtLocation(15.3647, 75.1240);
+        }
+      };
+      
+      setTimeout(forceLoad, 2000); // 2 second absolute timeout for IP fetch
+
+      fetch('https://get.geojs.io/v1/ip/geo.json')
         .then(r => r.json())
-        .then(d => loadMapAtLocation(d.latitude || 15.3647, d.longitude || 75.1240))
-        .catch(() => loadMapAtLocation(15.3647, 75.1240));
+        .then(d => {
+          if (!resolved) {
+            resolved = true;
+            loadMapAtLocation(parseFloat(d.latitude) || 15.3647, parseFloat(d.longitude) || 75.1240);
+          }
+        })
+        .catch(() => forceLoad());
     }
 
     if (window.userLat && window.userLon) {
