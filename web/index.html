@@ -1876,6 +1876,7 @@
     async function loadDashboardData() {
       try {
         var history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+        if (!Array.isArray(history)) history = [];
         var totalScans = history.length;
         var totalScore = history.reduce(function (acc, x) {
           if (x.severity === 'healthy') return acc + 100;
@@ -1932,13 +1933,17 @@
 
         // Pump status
         loadPumpStatus();
-
+      } catch (e) { 
+        console.log('dashboard error', e); 
+      } finally {
         // Map & Location Weather Init
         if (!_mapInited) {
           _mapInited = true;
-          initDashboardMap();
+          if (typeof initDashboardMap === 'function') {
+            initDashboardMap();
+          }
         }
-      } catch (e) { console.log('dashboard error', e); }
+      }
     }
 
 
