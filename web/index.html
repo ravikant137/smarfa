@@ -512,10 +512,10 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
   <!-- Smarfa Modules -->
-  <script src="/js/config.js?v=3"></script>
-  <script src="/js/weather.js?v=3"></script>
-  <script src="/js/satellite.js?v=3"></script>
-  <script src="/js/dashboard.js?v=3"></script>
+  <script src="./js/config.js?v=4"></script>
+  <script src="./js/weather.js?v=4"></script>
+  <script src="./js/satellite.js?v=4"></script>
+  <script src="./js/dashboard.js?v=4"></script>
 
   <!-- Google Translate Styles -->
   <style>
@@ -1879,6 +1879,7 @@
         if (!Array.isArray(history)) history = [];
         var totalScans = history.length;
         var totalScore = history.reduce(function (acc, x) {
+          if (!x) return acc;
           if (x.severity === 'healthy') return acc + 100;
           if (x.severity === 'warning') return acc + 50;
           return acc;
@@ -1886,7 +1887,8 @@
         var score = totalScans > 0 ? Math.round(totalScore / totalScans) : 100;
 
         var recentAlerts = history.filter(s => {
-          var d = new Date(s.timestamp);
+          if (!s) return false;
+          var d = new Date(s.timestamp || Date.now());
           var now = new Date();
           var daysOld = (now - d) / (1000 * 60 * 60 * 24);
           return daysOld <= 7 && (s.severity === 'warning' || s.severity === 'critical');
@@ -1897,6 +1899,8 @@
         const color = score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444';
         document.getElementById('health-ring').style.background = 'conic-gradient(' + color + ' 0deg, ' + color + ' ' + deg + 'deg, #334155 ' + deg + 'deg)';
         document.getElementById('health-score').textContent = score;
+        const hLabel = document.getElementById('health-score-label');
+        if (hLabel) hLabel.textContent = totalScans > 0 ? 'From ' + totalScans + ' Scans' : 'No Scans Yet';
 
         // 2. Simulate Live IoT Sensors (Temp & Moisture) based on time of day
         var hour = new Date().getHours();
