@@ -36,8 +36,10 @@
     const API = window.APP ? window.APP.API : window.location.origin;
 
     function loadMapAtLocation(lat, lon) {
-      window.APP.userLat = lat;
-      window.APP.userLon = lon;
+      if (window.APP) {
+        window.APP.userLat = lat;
+        window.APP.userLon = lon;
+      }
 
       const overlay = document.getElementById('map-loading-overlay');
       if (overlay) overlay.style.display = 'none';
