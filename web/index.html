@@ -3874,9 +3874,9 @@
       // Simulated loading sequence
       p.textContent = 'Acquiring Live GPS Coordinates...';
 
-      setTimeout(function () { p.textContent = 'Connecting to Sentinel-2 Satellite...'; }, 1000);
-      setTimeout(function () { p.textContent = 'Downloading Multi-spectral Imagery...'; }, 2000);
-      setTimeout(function () { p.textContent = 'Generating NDVI Heatmap...'; }, 3000);
+      setTimeout(function () { p.textContent = 'Connecting to Sentinel-2 Satellite...'; }, 100);
+      setTimeout(function () { p.textContent = 'Downloading Multi-spectral Imagery...'; }, 250);
+      setTimeout(function () { p.textContent = 'Generating NDVI Heatmap...'; }, 400);
 
       setTimeout(function () {
         loading.style.display = 'none';
@@ -3900,6 +3900,8 @@
             '</div></div>';
         }
 
+        if (satelliteMap) { satelliteMap.remove(); satelliteMap = null; }
+
         results.innerHTML = '<div class="result-card" style="border:1px solid var(--border); margin-top:16px;">' +
           '<h3 style="margin-bottom:8px;color:var(--text);font-size:18px;">🛰️ Satellite NDVI Results</h3>' +
           '<p style="font-size:13px;color:var(--muted);line-height:1.5;">12% of the Northern field shows severe nutrient stress.</p>' +
@@ -3913,9 +3915,6 @@
           '</div>';
 
         results.style.display = 'block';
-
-        // Initialize Leaflet Map
-        if (satelliteMap) { satelliteMap.remove(); }
 
         var radiusMeters = parseInt(document.getElementById('scan-radius') ? document.getElementById('scan-radius').value : 500);
         var offset = radiusMeters * 0.000009; // Approx degrees mapping
@@ -3976,7 +3975,7 @@
           }
         }
 
-      }, 4000);
+      }, 500);
     }
   </script>
 
