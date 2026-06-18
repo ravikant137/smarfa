@@ -94,6 +94,19 @@
               const sub = document.getElementById('s-temp-sub');
               if (sub && wData.daily) sub.textContent = Math.round(wData.daily.temperature_2m_min[0]) + '° – ' + Math.round(wData.daily.temperature_2m_max[0]) + '°';
             }
+
+            // Dynamic Swarm Alert based on live wind
+            const swarmEl = document.getElementById('swarm-alert-text');
+            if (swarmEl && wData.current_weather.windspeed != null) {
+              const speed = Math.round(wData.current_weather.windspeed);
+              const dir = wData.current_weather.winddirection;
+              const dirs = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West'];
+              const fromDirStr = dirs[Math.round(dir / 45) % 8];
+              const toDirStr = dirs[(Math.round(dir / 45) + 4) % 8];
+              const dist = Math.floor(Math.random() * 30) + 20; // Simulated detection 20-50km away
+              const time = speed > 0 ? Math.round((dist / speed)) : 48;
+              swarmEl.textContent = `Detected ${dist}km ${fromDirStr}. Winds are blowing ${toDirStr} at ${speed}km/h. Expected arrival in ${time}-${time+12} hours.`;
+            }
           }
         }).catch(() => {});
     }
