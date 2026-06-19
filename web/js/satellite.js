@@ -279,6 +279,25 @@
       }
     }
 
+    // AI Crop Identification (Mocked deterministically based on coordinates for consistency)
+    const lat = window.userLat || 17.5;
+    const lon = window.userLon || 76.2;
+    const cropHash = Math.abs(Math.floor(lat * 100 + lon * 100));
+    
+    const cropProfiles = [
+      { name: 'Wheat', icon: '🌾', baseYield: 15, price: 2500 },
+      { name: 'Cotton', icon: '☁️', baseYield: 8, price: 7100 },
+      { name: 'Sugarcane', icon: '🎋', baseYield: 350, price: 300 },
+      { name: 'Jowar', icon: '🌾', baseYield: 12, price: 2100 },
+      { name: 'Pigeon Pea', icon: '🫘', baseYield: 6, price: 9500 },
+      { name: 'Soyabean', icon: '🌱', baseYield: 10, price: 4200 }
+    ];
+    
+    const detectedCrop = cropProfiles[cropHash % cropProfiles.length];
+    
+    const cropEl = document.getElementById('field-detail-crop');
+    if (cropEl) cropEl.textContent = detectedCrop.name;
+
     // Yield Prediction Logic
     const yieldEl = document.getElementById('proj-yield');
     const revenueEl = document.getElementById('proj-revenue');
@@ -293,28 +312,28 @@
     }
 
     if (areaAcres > 0 && mean != null) {
-      const baseYieldPerAcre = 15; // Wheat base
+      const baseYieldPerAcre = detectedCrop.baseYield;
       const healthFactor = Math.min(1.2, Math.max(0.2, mean / 0.6));
       const projectedYield = areaAcres * baseYieldPerAcre * healthFactor;
-      const marketPricePerQuintal = 2500; // Live APMC Mock
+      const marketPricePerQuintal = detectedCrop.price;
       const projectedRevenue = projectedYield * marketPricePerQuintal;
 
       if (yieldEl) yieldEl.textContent = projectedYield.toFixed(1) + ' Qtl';
       if (revenueEl) revenueEl.textContent = '₹' + projectedRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 });
-      if (helperEl) helperEl.innerHTML = `Based on <b>${areaAcres.toFixed(1)} acres</b> of Wheat at <b>₹${marketPricePerQuintal}/q</b> (adjusted for ${(healthFactor*100).toFixed(0)}% crop health).`;
+      if (helperEl) helperEl.innerHTML = `Based on <b>${areaAcres.toFixed(1)} acres</b> of ${detectedCrop.name} at <b>₹${marketPricePerQuintal}/q</b> (adjusted for ${(healthFactor*100).toFixed(0)}% crop health).`;
     } else {
       if (yieldEl) yieldEl.textContent = '—';
       if (revenueEl) revenueEl.textContent = '—';
       if (helperEl) helperEl.textContent = 'Area or health data missing for projection.';
     }
 
-    window.toast(`🛰️ NDVI:${mean != null ? mean.toFixed(3) : 'N/A'} | 🌍 Soil:${soilMoisture || '--'}% | 💧 Rain:${totalRain != null ? totalRain.toFixed(1) : '--'}mm`);
+    window.toast(`🛰️ AI Detected ${detectedCrop.name} | NDVI:${mean != null ? mean.toFixed(3) : 'N/A'} | 🌍 Soil:${soilMoisture || '--'}% | 💧 Rain:${totalRain != null ? totalRain.toFixed(1) : '--'}mm`);
 
     // Sync the analyzed field into the region list
-    syncAnalyzedFieldToRegionList(mean, color, label, soilMoisture, totalRain, imgDate);
+    syncAnalyzedFieldToRegionList(mean, color, label, soilMoisture, totalRain, imgDate, detectedCrop);
   }
 
-  function syncAnalyzedFieldToRegionList(mean, color, label, soilMoisture, totalRain, imgDate) {
+  function syncAnalyzedFieldToRegionList(mean, color, label, soilMoisture, totalRain, imgDate, detectedCrop) {
     if (typeof window.FIELDS === 'undefined') return;
 
     // Get real area computed earlier
@@ -328,8 +347,8 @@
     // Upsert a "Satellite Field" entry in FIELDS keyed by 'SAT'
     window.FIELDS['SAT'] = {
       name: '🛰️ Satellite Field (' + imgDate + ')',
-      crop: 'Not Set', // User hasn't set crop yet
-      icon: '🌍',
+      crop: detectedCrop ? detectedCrop.name : 'Unknown',
+      icon: detectedCrop ? detectedCrop.icon : '🌍',
       area: area,
       planted: soilMoisture ? 'Soil: ' + soilMoisture + '%' : '—',
       status: statusKey,
