@@ -57,8 +57,10 @@
         maxZoom: 22, maxNativeZoom: 19, attribution: '© Google Earth Engine'
       }).addTo(window.dashMap);
 
-      setTimeout(() => { if (window.dashMap) window.dashMap.invalidateSize(); }, 100);
-      setTimeout(() => { if (window.dashMap) window.dashMap.invalidateSize(); }, 500);
+      // Force tile rendering - fires multiple times to cover all timing edge cases
+      [100, 500, 1000, 2000].forEach(function(ms) {
+        setTimeout(function() { if (window.dashMap) window.dashMap.invalidateSize(); }, ms);
+      });
 
       // Bulletproof fix for Leaflet grey tile bug on tab switch
       const mapContainer = document.getElementById('farm-map');

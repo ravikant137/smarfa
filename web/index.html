@@ -515,7 +515,7 @@
   <script src="./js/config.js?v=4"></script>
   <script src="./js/weather.js?v=4"></script>
   <script src="./js/satellite.js?v=8"></script>
-  <script src="./js/dashboard.js?v=6"></script>
+  <script src="./js/dashboard.js?v=7"></script>
 
   <!-- Google Translate Styles -->
   <style>
@@ -1710,6 +1710,10 @@
       loadDashboardData();
       fetchMarketPrices();
       checkAI();
+      // Force satellite tiles to render after the app container becomes visible
+      [300, 700, 1500].forEach(function(ms) {
+        setTimeout(function() { if (window.dashMap) window.dashMap.invalidateSize(); }, ms);
+      });
     }
 
     function logout() {
@@ -1737,7 +1741,7 @@
         });
       }
       if (tab === 'lifecycle') { if (!_lifecycleInited) { renderCropSelectorGrid(); _lifecycleInited = true; } renderFieldStatusStrip(); renderRegionalCrops(); }
-      if (tab === 'dashboard') { loadDashboardData(); renderDashRecentScans(); fetchMarketPrices(); }
+      if (tab === 'dashboard') { loadDashboardData(); renderDashRecentScans(); fetchMarketPrices(); setTimeout(function(){ if(window.dashMap){ window.dashMap.invalidateSize(); } }, 200); }
       if (tab === 'history') { loadHistoryData(); }
       if (tab === 'marketplace') { loadMarketplace(); }
     }
