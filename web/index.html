@@ -1710,9 +1710,14 @@
       loadDashboardData();
       fetchMarketPrices();
       checkAI();
-      // Force satellite tiles to render after the app container becomes visible
-      [300, 700, 1500].forEach(function(ms) {
-        setTimeout(function() { if (window.dashMap) window.dashMap.invalidateSize(); }, ms);
+      // Trigger map after browser paints the visible app
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          if (!window._mapInited && typeof initDashboardMap === 'function') {
+            initDashboardMap();
+            window._mapInited = true;
+          }
+        });
       });
     }
 
@@ -1741,7 +1746,22 @@
         });
       }
       if (tab === 'lifecycle') { if (!_lifecycleInited) { renderCropSelectorGrid(); _lifecycleInited = true; } renderFieldStatusStrip(); renderRegionalCrops(); }
-      if (tab === 'dashboard') { loadDashboardData(); renderDashRecentScans(); fetchMarketPrices(); setTimeout(function(){ if(window.dashMap){ window.dashMap.invalidateSize(); } }, 200); }
+      if (tab === 'dashboard') {
+        loadDashboardData();
+        renderDashRecentScans();
+        fetchMarketPrices();
+        // Defer map init/refresh until after browser paints the now-visible tab
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            if (!window._mapInited) {
+              if (typeof initDashboardMap === 'function') initDashboardMap();
+              window._mapInited = true;
+            } else if (window.dashMap) {
+              window.dashMap.invalidateSize();
+            }
+          });
+        });
+      }
       if (tab === 'history') { loadHistoryData(); }
       if (tab === 'marketplace') { loadMarketplace(); }
     }
@@ -1944,13 +1964,7 @@
       } catch (e) { 
         console.log('dashboard error', e); 
       } finally {
-        // Map & Location Weather Init
-        if (!_mapInited) {
-          _mapInited = true;
-          if (typeof initDashboardMap === 'function') {
-            initDashboardMap();
-          }
-        }
+        // Map init is now deferred via requestAnimationFrame in switchTab/enterApp
       }
     }
 
