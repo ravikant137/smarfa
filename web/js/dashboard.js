@@ -57,7 +57,16 @@
         maxZoom: 22, maxNativeZoom: 19, attribution: '© Google Earth Engine'
       }).addTo(window.dashMap);
 
-      setTimeout(() => { if (window.dashMap) window.dashMap.invalidateSize(); }, 300);
+      setTimeout(() => { if (window.dashMap) window.dashMap.invalidateSize(); }, 100);
+      setTimeout(() => { if (window.dashMap) window.dashMap.invalidateSize(); }, 500);
+
+      // Bulletproof fix for Leaflet grey tile bug on tab switch
+      const mapContainer = document.getElementById('farm-map');
+      if (mapContainer && window.ResizeObserver) {
+        new ResizeObserver(() => {
+          if (window.dashMap) window.dashMap.invalidateSize();
+        }).observe(mapContainer);
+      }
 
       // Initialize polygon drawing tool
       if (window.initSatelliteDrawing) window.initSatelliteDrawing(window.dashMap);
