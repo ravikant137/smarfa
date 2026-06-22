@@ -130,40 +130,27 @@
         }).catch(() => {});
     }
 
-    function fallbackToIP() {
-      let resolved = false;
-      const forceLoad = () => {
-        if (!resolved) {
-          resolved = true;
-          loadMapAtLocation(15.3647, 75.1240);
+    // Wait for GPS coords set by index.html watchPosition — poll up to 10s
+    function waitForLocationAndLoad() {
+      let attempts = 0;
+      const maxAttempts = 50; // 50 × 200ms = 10s max wait
+      const check = setInterval(function() {
+        attempts++;
+        if (window.userLat && window.userLon) {
+          clearInterval(check);
+          loadMapAtLocation(window.userLat, window.userLon);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(check);
+          // Last resort: IP geolocation
+          fetch('https://get.geojs.io/v1/ip/geo.json')
+            .then(r => r.json())
+            .then(d => loadMapAtLocation(parseFloat(d.latitude) || 17.524, parseFloat(d.longitude) || 76.205))
+            .catch(() => loadMapAtLocation(17.524, 76.205)); // Akkalkot default
         }
-      };
-      
-      setTimeout(forceLoad, 2000); // 2 second absolute timeout for IP fetch
-
-      fetch('https://get.geojs.io/v1/ip/geo.json')
-        .then(r => r.json())
-        .then(d => {
-          if (!resolved) {
-            resolved = true;
-            loadMapAtLocation(parseFloat(d.latitude) || 15.3647, parseFloat(d.longitude) || 75.1240);
-          }
-        })
-        .catch(() => forceLoad());
+      }, 200);
     }
 
-    if (window.userLat && window.userLon) {
-      loadMapAtLocation(window.userLat, window.userLon);
-    } else if (!navigator.geolocation) { 
-      fallbackToIP(); 
-    } else {
-      const timeout = setTimeout(() => { console.warn('GPS timeout, using IP'); fallbackToIP(); }, 4000);
-      navigator.geolocation.getCurrentPosition(
-        pos => { clearTimeout(timeout); loadMapAtLocation(pos.coords.latitude, pos.coords.longitude); },
-        () => { clearTimeout(timeout); fallbackToIP(); },
-        { enableHighAccuracy: true, timeout: 3500, maximumAge: 0 }
-      );
-    }
+    waitForLocationAndLoad();
   };
 
 })();
